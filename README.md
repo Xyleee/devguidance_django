@@ -231,6 +231,66 @@
         }
         ```
 
+## Messaging System
+
+### Send Message
+
+*   **Method:** `POST`
+*   **Endpoint:** `/api/users/messages/`
+*   **Headers:** `Authorization: Bearer <token>`
+*   **Request Body:**
+    ```json
+    {
+        "receiver": 2,  // User ID of the recipient
+        "content": "Hello, can you help me with my project?"
+    }
+    ```
+*   **Sample Success Response (201 Created):**
+    ```json
+    {
+        "id": 1,
+        "sender": 1,
+        "receiver": 2,
+        "content": "Hello, can you help me with my project?",
+        "file_url": null,
+        "timestamp": "2023-06-02T14:35:22Z"
+    }
+    ```
+
+### Get Message History
+
+*   **Method:** `GET`
+*   **Endpoint:** `/api/users/messages/<user_id>/`
+*   **Headers:** `Authorization: Bearer <token>`
+*   **Sample Success Response (200 OK):**
+    ```json
+    [
+        {
+            "id": 1,
+            "sender": 1,
+            "receiver": 2,
+            "content": "Hello, can you help me with my project?",
+            "file_url": null,
+            "timestamp": "2023-06-02T14:35:22Z"
+        },
+        {
+            "id": 2,
+            "sender": 2,
+            "receiver": 1,
+            "content": "Yes, I'd be happy to help. What's the project about?",
+            "file_url": null,
+            "timestamp": "2023-06-02T14:40:15Z"
+        }
+    ]
+    ```
+
+### Real-time Message Stream
+
+*   **Method:** `GET`
+*   **Endpoint:** `/api/users/messages/stream/<user_id>/`
+*   **Headers:** `Authorization: Bearer <token>`
+*   **Description:** Establishes an event stream connection for real-time message updates.
+
 ## Protected Example Route
 
 *   **Method:** `GET`
