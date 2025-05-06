@@ -1,5 +1,16 @@
 # DevGuidance API Documentation
 
+## Installation Requirements
+
+The API requires the following dependencies:
+* Python 3.x
+* Django and Django REST Framework
+* PostgreSQL database
+* Python libraries:
+  * python-magic or python-magic-bin (on Windows)
+  * Pillow for image processing
+  * djangorestframework-simplejwt for authentication
+
 ## Rate Limiting
 
 The API implements custom rate limiting to prevent abuse. The following endpoints are protected by rate limits:
@@ -22,7 +33,7 @@ When a rate limit is exceeded, the API returns:
 ### Register User
 
 *   **Method:** `POST`
-*   **Endpoint:** `/api/users/register/`
+*   **Endpoint:** `/api/users/api/register/`
 *   **Rate Limit:** 5 requests per minute
 *   **Headers:**
     *   `Content-Type: application/json`
@@ -34,6 +45,8 @@ When a rate limit is exceeded, the API returns:
         "password": "epassword",
         "password2": "epassword",
         "user_type": "student", // Or "mentor"
+        "name": "Test User",
+        "photo": "base64EncodedImage", // Optional
         "first_name": "Test", // Optional
         "last_name": "User"   // Optional
     }
@@ -50,7 +63,8 @@ When a rate limit is exceeded, the API returns:
             "name": "Test User",
             "bio": "",
             "year_level": 1,
-            "tech_stack": []
+            "tech_stack": [],
+            "photo_url": "/media/profile_photos/student/abc123.jpg"
             // Or mentor profile fields
         },
         "message": "User registered successfully as a student."
@@ -63,12 +77,6 @@ When a rate limit is exceeded, the API returns:
             "Password fields didn't match."
         ]
         // Or other validation errors
-    }
-    ```
-*   **Sample Rate Limit Exceeded Response (429 Too Many Requests):**
-    ```json
-    {
-        "detail": "Rate limit exceeded. Try again in 45 seconds."
     }
     ```
 
@@ -125,24 +133,31 @@ When a rate limit is exceeded, the API returns:
     *   **Response (200 OK):**
         ```json
         {
+            "id": 1,
             "name": "Student Name",
             "bio": "Student bio",
             "year_level": 2,
-            "tech_stack": ["Python", "Django", "React"]
+            "tech_stack": ["Python", "Django", "React"],
+            "photo_url": "/media/profile_photos/student/abc123.jpg",
+            "created_at": "2023-06-01T12:00:00Z",
+            "updated_at": "2023-06-02T12:00:00Z"
         }
         ```
 
 *   **Update Profile**
     *   **Method:** `PUT/PATCH`
     *   **Endpoint:** `/api/users/api/student-profiles/<id>/`
-    *   **Headers:** `Authorization: Bearer <token>`
+    *   **Headers:** 
+        * `Authorization: Bearer <token>`
+        * `Content-Type: multipart/form-data` (for photo upload)
     *   **Request Body:**
         ```json
         {
             "name": "Updated Name",
             "bio": "New bio",
             "year_level": 3,
-            "tech_stack": ["Python", "Django", "React", "NextJS"]
+            "tech_stack": ["Python", "Django", "React", "NextJS"],
+            "photo": "[file upload]"  // Optional
         }
         ```
 
@@ -204,14 +219,17 @@ When a rate limit is exceeded, the API returns:
 *   **Update Profile**
     *   **Method:** `PUT/PATCH`
     *   **Endpoint:** `/api/users/api/mentor-profiles/<id>/`
-    *   **Headers:** `Authorization: Bearer <token>`
+    *   **Headers:** 
+        * `Authorization: Bearer <token>`
+        * `Content-Type: multipart/form-data` (for photo upload)
     *   **Request Body:**
         ```json
         {
             "name": "Mentor Name",
             "bio": "Mentor bio",
             "experience_years": 5,
-            "expertise_tags": ["Python", "Django", "Machine Learning"]
+            "expertise_tags": ["Python", "Django", "Machine Learning"],
+            "photo": "[file upload]"  // Optional
         }
         ```
 
@@ -263,12 +281,15 @@ When a rate limit is exceeded, the API returns:
 
 *   **Method:** `POST`
 *   **Endpoint:** `/api/users/messages/`
-*   **Headers:** `Authorization: Bearer <token>`
+*   **Headers:** 
+    * `Authorization: Bearer <token>`
+    * `Content-Type: multipart/form-data` (for file uploads)
 *   **Request Body:**
     ```json
     {
         "receiver": 2,  // User ID of the recipient
-        "content": "Hello, can you help me with my project?"
+        "content": "Hello, can you help me with my project?",
+        "file": "[file upload]"  // Optional
     }
     ```
 *   **Sample Success Response (201 Created):**
@@ -277,8 +298,10 @@ When a rate limit is exceeded, the API returns:
         "id": 1,
         "sender": 1,
         "receiver": 2,
+        "sender_username": "student1",
+        "receiver_username": "mentor1",
         "content": "Hello, can you help me with my project?",
-        "file_url": null,
+        "file_url": "/media/message_files/document.pdf",
         "timestamp": "2023-06-02T14:35:22Z"
     }
     ```
@@ -295,14 +318,18 @@ When a rate limit is exceeded, the API returns:
             "id": 1,
             "sender": 1,
             "receiver": 2,
+            "sender_username": "student1",
+            "receiver_username": "mentor1",
             "content": "Hello, can you help me with my project?",
-            "file_url": null,
+            "file_url": "/media/message_files/document.pdf",
             "timestamp": "2023-06-02T14:35:22Z"
         },
         {
             "id": 2,
             "sender": 2,
             "receiver": 1,
+            "sender_username": "mentor1",
+            "receiver_username": "student1",
             "content": "Yes, I'd be happy to help. What's the project about?",
             "file_url": null,
             "timestamp": "2023-06-02T14:40:15Z"
@@ -329,6 +356,19 @@ When a rate limit is exceeded, the API returns:
     }
     ```
 
+## File Upload Validation
+
+The API implements strict validation for all file uploads:
+
+### Profile Photos
+- Maximum size: 2MB
+- Allowed formats: JPEG, PNG, WebP
+- Automatically cropped to 1:1 aspect ratio
+
+### Message Attachments
+- Maximum size: 5MB
+- Allowed formats: PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, JPEG, GIF
+
 ## Testing Rate Limiting
 
 To test the rate limiting functionality:
@@ -341,7 +381,7 @@ Example using curl:
 ```bash
 # Send multiple registration requests quickly
 for i in {1..6}; do
-  curl -X POST http://localhost:8000/api/users/register/ \
+  curl -X POST http://localhost:8000/api/users/api/register/ \
     -H "Content-Type: application/json" \
     -d '{"username":"test'$i'", "password":"test123", "password2":"test123", "email":"test'$i'@example.com", "user_type": "student", "name": "Test User '$i'"}'
   echo -e "\n"

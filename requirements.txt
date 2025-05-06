@@ -3,3 +3,7 @@ Django==5.1.6
 psycopg2-binary==2.9.10
 sqlparse==0.5.3
 tzdata==2025.1
+Pillow==10.0.0
+python-magic==0.4.27
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.2.2

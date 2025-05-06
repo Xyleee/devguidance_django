@@ -2,16 +2,45 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from .models import StudentProfile, StudentProject, MentorProfile, MentorshipRequest, Message
+from django.core.files.uploadedfile import UploadedFile
+from django.core.exceptions import ValidationError
+import os
+import magic
 
-class RegisterSerializer(serializers.ModelSerializer):
+class PhotoValidationMixin:
+    """Mixin for validating photo uploads"""
+    
+    def validate_photo(self, photo):
+        if not photo:
+            return photo
+            
+        # Validate file size (2MB max)
+        if photo.size > 2 * 1024 * 1024:  # 2MB in bytes
+            raise serializers.ValidationError("Image file too large. Maximum size is 2MB.")
+            
+        # Validate file type
+        mime = magic.Magic(mime=True)
+        file_type = mime.from_buffer(photo.read())
+        photo.seek(0)  # Reset file pointer after reading
+        
+        valid_types = ['image/jpeg', 'image/png', 'image/webp']
+        if file_type not in valid_types:
+            raise serializers.ValidationError(
+                "Invalid image format. Only JPEG, PNG, and WebP are supported."
+            )
+            
+        return photo
+
+class RegisterSerializer(serializers.ModelSerializer, PhotoValidationMixin):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True)
     user_type = serializers.ChoiceField(choices=['student', 'mentor'], required=True)
     name = serializers.CharField(required=True)
+    photo = serializers.ImageField(required=False)
     
     class Meta:
         model = User
-        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name', 'user_type', 'name')
+        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name', 'user_type', 'name', 'photo')
         extra_kwargs = {
             'first_name': {'required': False},
             'last_name': {'required': False},
@@ -25,6 +54,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Remove user_type and name from attrs to prevent them being used in User creation
         self.user_type = attrs.pop('user_type')
         self.name = attrs.pop('name')
+        
+        # Handle photo separately
+        self.photo = None
+        if 'photo' in attrs:
+            self.photo = attrs.pop('photo')
+            if self.photo:
+                self.validate_photo(self.photo)
+                
         return attrs
 
     def create(self, validated_data):
@@ -40,15 +77,20 @@ class RegisterSerializer(serializers.ModelSerializer):
         
         # Create the appropriate profile based on user_type
         if self.user_type == 'student':
-            StudentProfile.objects.create(
+            profile = StudentProfile.objects.create(
                 user=user,
                 name=self.name
             )
         elif self.user_type == 'mentor':
-            MentorProfile.objects.create(
+            profile = MentorProfile.objects.create(
                 user=user,
                 name=self.name
             )
+        
+        # Add photo if provided
+        if self.photo:
+            profile.photo = self.photo
+            profile.save()
             
         return user
 
@@ -58,29 +100,76 @@ class StudentProjectSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'tools_used', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
 
-class StudentProfileSerializer(serializers.ModelSerializer):
+class StudentProfileSerializer(serializers.ModelSerializer, PhotoValidationMixin):
     projects = StudentProjectSerializer(many=True, read_only=True)
+    photo_url = serializers.SerializerMethodField()
     
     class Meta:
         model = StudentProfile
-        fields = ['id', 'name', 'bio', 'year_level', 'tech_stack', 'projects', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'bio', 'year_level', 'tech_stack', 'projects', 'photo', 'photo_url', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'photo': {'write_only': True}
+        }
     
     def create(self, validated_data):
         user = self.context['request'].user
         validated_data['user'] = user
+        
+        if 'photo' in validated_data:
+            photo = validated_data['photo']
+            if photo:
+                self.validate_photo(photo)
+                
         return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        if 'photo' in validated_data:
+            photo = validated_data['photo']
+            if photo:
+                self.validate_photo(photo)
+                
+        return super().update(instance, validated_data)
+    
+    def get_photo_url(self, obj):
+        if obj.photo:
+            return obj.photo.url
+        return None
 
-class MentorProfileSerializer(serializers.ModelSerializer):
+class MentorProfileSerializer(serializers.ModelSerializer, PhotoValidationMixin):
+    photo_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = MentorProfile
-        fields = ['id', 'name', 'bio', 'experience_years', 'expertise_tags', 'created_at', 'updated_at']
+        fields = ['id', 'name', 'bio', 'experience_years', 'expertise_tags', 'photo', 'photo_url', 'created_at', 'updated_at']
         read_only_fields = ['created_at', 'updated_at']
+        extra_kwargs = {
+            'photo': {'write_only': True}
+        }
     
     def create(self, validated_data):
         user = self.context['request'].user
         validated_data['user'] = user
+        
+        if 'photo' in validated_data:
+            photo = validated_data['photo']
+            if photo:
+                self.validate_photo(photo)
+                
         return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        if 'photo' in validated_data:
+            photo = validated_data['photo']
+            if photo:
+                self.validate_photo(photo)
+                
+        return super().update(instance, validated_data)
+    
+    def get_photo_url(self, obj):
+        if obj.photo:
+            return obj.photo.url
+        return None
 
 class MentorListSerializer(serializers.ModelSerializer):
     """Serializer for listing available mentors"""
@@ -88,17 +177,21 @@ class MentorListSerializer(serializers.ModelSerializer):
     bio = serializers.CharField(source='mentor_profile.bio')
     expertise_tags = serializers.JSONField(source='mentor_profile.expertise_tags')
     experience_years = serializers.IntegerField(source='mentor_profile.experience_years')
+    photo_url = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'name', 'bio', 'expertise_tags', 'experience_years']
-
+        fields = ['id', 'username', 'name', 'bio', 'expertise_tags', 'experience_years', 'photo_url']
+    
+    def get_photo_url(self, obj):
+        if hasattr(obj, 'mentor_profile') and obj.mentor_profile.photo:
+            return obj.mentor_profile.photo.url
+        return None
 
 class StudentProjectListSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProject
         fields = ['id', 'title', 'description', 'tools_used']
-
 
 class StudentDetailSerializer(serializers.ModelSerializer):
     """Serializer for detailed student information with projects"""
@@ -107,16 +200,21 @@ class StudentDetailSerializer(serializers.ModelSerializer):
     year_level = serializers.IntegerField(source='student_profile.year_level')
     tech_stack = serializers.JSONField(source='student_profile.tech_stack')
     projects = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'name', 'bio', 'year_level', 'tech_stack', 'projects']
+        fields = ['id', 'username', 'name', 'bio', 'year_level', 'tech_stack', 'projects', 'photo_url']
     
     def get_projects(self, obj):
         student_profile = obj.student_profile
         projects = StudentProject.objects.filter(student=student_profile)
         return StudentProjectListSerializer(projects, many=True).data
-
+    
+    def get_photo_url(self, obj):
+        if hasattr(obj, 'student_profile') and obj.student_profile.photo:
+            return obj.student_profile.photo.url
+        return None
 
 class MentorshipRequestSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.student_profile.name', read_only=True)
@@ -171,7 +269,39 @@ class MentorshipRequestSerializer(serializers.ModelSerializer):
         validated_data['student'] = self.context['request'].user
         return super().create(validated_data)
 
-class MessageSerializer(serializers.ModelSerializer):
+class FileValidationMixin:
+    """Mixin for validating file uploads for messages"""
+    
+    def validate_file(self, file):
+        if not file:
+            return file
+            
+        # Validate file size (2MB max)
+        if file.size > 2 * 1024 * 1024:  # 2MB in bytes
+            raise serializers.ValidationError("File too large. Maximum size is 2MB.")
+            
+        # Validate file type
+        mime = magic.Magic(mime=True)
+        file_type = mime.from_buffer(file.read())
+        file.seek(0)  # Reset file pointer after reading
+        
+        valid_types = [
+            # Images
+            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+            # Documents
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain', 'application/rtf'
+        ]
+        
+        if file_type not in valid_types:
+            raise serializers.ValidationError(
+                "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF."
+            )
+            
+        return file
+
+class MessageSerializer(serializers.ModelSerializer, FileValidationMixin):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
     receiver_username = serializers.CharField(source='receiver.username', read_only=True)
     file_url = serializers.CharField(read_only=True)
@@ -186,4 +316,9 @@ class MessageSerializer(serializers.ModelSerializer):
         # Ensure either content or file is provided
         if not attrs.get('content') and not attrs.get('file'):
             raise serializers.ValidationError("Either content or file must be provided")
+            
+        # Validate file if provided
+        if file := attrs.get('file'):
+            self.validate_file(file)
+            
         return attrs
