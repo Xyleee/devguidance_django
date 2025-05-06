@@ -1,11 +1,29 @@
 # DevGuidance API Documentation
 
+## Rate Limiting
+
+The API implements custom rate limiting to prevent abuse. The following endpoints are protected by rate limits:
+
+* **Register User**: 5 requests per 60 seconds
+* **Obtain Token**: 5 requests per 60 seconds
+* **Refresh Token**: 10 requests per 60 seconds
+
+When a rate limit is exceeded, the API returns:
+* **Status Code**: 429 Too Many Requests
+* **Response Body**:
+  ```json
+  {
+    "detail": "Rate limit exceeded. Try again in X seconds."
+  }
+  ```
+
 ## Authentication
 
 ### Register User
 
 *   **Method:** `POST`
 *   **Endpoint:** `/api/users/register/`
+*   **Rate Limit:** 5 requests per minute
 *   **Headers:**
     *   `Content-Type: application/json`
 *   **Request Body:**
@@ -47,11 +65,18 @@
         // Or other validation errors
     }
     ```
+*   **Sample Rate Limit Exceeded Response (429 Too Many Requests):**
+    ```json
+    {
+        "detail": "Rate limit exceeded. Try again in 45 seconds."
+    }
+    ```
 
 ### Login (Get Token)
 
 *   **Method:** `POST`
 *   **Endpoint:** `/api/token/`
+*   **Rate Limit:** 5 requests per minute
 *   **Headers:**
     *   `Content-Type: application/json`
 *   **Request Body:**
@@ -73,6 +98,7 @@
 
 *   **Method:** `POST`
 *   **Endpoint:** `/api/token/refresh/`
+*   **Rate Limit:** 10 requests per minute
 *   **Headers:**
     *   `Content-Type: application/json`
 *   **Request Body:**
@@ -302,3 +328,24 @@
         "message": "Hello, yourusername! This is protected content."
     }
     ```
+
+## Testing Rate Limiting
+
+To test the rate limiting functionality:
+
+1. Send multiple requests to a rate-limited endpoint in quick succession
+2. After exceeding the rate limit (e.g., 5 requests in 1 minute for registration), you'll receive a 429 response
+3. The response will indicate how many seconds to wait before trying again
+
+Example using curl:
+```bash
+# Send multiple registration requests quickly
+for i in {1..6}; do
+  curl -X POST http://localhost:8000/api/users/register/ \
+    -H "Content-Type: application/json" \
+    -d '{"username":"test'$i'", "password":"test123", "password2":"test123", "email":"test'$i'@example.com", "user_type": "student", "name": "Test User '$i'"}'
+  echo -e "\n"
+  sleep 1
+done
+```
+```

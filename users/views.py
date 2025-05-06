@@ -26,6 +26,8 @@ import time
 from django.conf import settings
 import os
 from django.utils import timezone
+from .rate_limiting import rate_limit
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 # Create your views here.
 
@@ -404,3 +406,21 @@ class MessageStreamView(APIView):
             
             # Sleep to avoid excessive database queries
             time.sleep(2)  # Check for new messages every 2 seconds
+
+class RateLimitedRegisterView(RegisterView):
+    """Rate-limited version of the register view"""
+    @rate_limit(max_requests=5, timeframe=60)
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+class RateLimitedTokenObtainPairView(TokenObtainPairView):
+    """Rate-limited version of the token obtain pair view"""
+    @rate_limit(max_requests=5, timeframe=60)
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+class RateLimitedTokenRefreshView(TokenRefreshView):
+    """Rate-limited version of the token refresh view"""
+    @rate_limit(max_requests=10, timeframe=60)
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
