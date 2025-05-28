@@ -32,6 +32,7 @@ class PhotoValidationMixin:
         return photo
 
 class RegisterSerializer(serializers.ModelSerializer, PhotoValidationMixin):
+    email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True)
     user_type = serializers.ChoiceField(choices=['student', 'mentor'], required=True)

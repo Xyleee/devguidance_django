@@ -1,0 +1,40 @@
+services:
+  # Django Web Service
+  - type: web
+    name: devguidance-api
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn devguidance_django.wsgi:application"
+    plan: free  # Change to 'starter' for production
+    healthCheckPath: /api/docs/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devguidance-db
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://your-frontend-domain.com,http://localhost:3000
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://devguidance-api.onrender.com,https://your-frontend-domain.com
+
+  # PostgreSQL Database
+  - type: pgsql
+    name: devguidance-db
+    databaseName: devguidance
+    user: devguidance_user
+    plan: free  # Change to 'starter' for production
+    
+  # Redis for Caching (Optional - uncomment if needed)
+  # - type: redis
+  #   name: devguidance-redis
+  #   plan: free
+  #   maxmemoryPolicy: allkeys-lru 

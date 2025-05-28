@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
+from decouple import config, Csv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,12 +24,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9lm*)es%5eex%6p+16#0^80)aq-$3^f#uder_zmi03(_e(n6_u'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-9lm*)es%5eex%6p+16#0^80)aq-$3^f#uder_zmi03(_e(n6_u')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv())
 
 
 # Application definition
@@ -41,11 +43,18 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_extensions',
+    'drf_spectacular',
+    'corsheaders',  # Added for CORS support
     'users',
+    'students',
+    'mentors',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Must be at the top
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Added for static files on Vercel
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -78,16 +87,24 @@ WSGI_APPLICATION = 'devguidance_django.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'devguidance',
-        'USER': 'myuser',
-        'PASSWORD': 'password',
-        'HOST': 'localhost',
-        'PORT': '5432',
+# Use DATABASE_URL environment variable if available, otherwise use default PostgreSQL config
+DATABASE_URL = config('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='devguidance'),
+            'USER': config('DB_USER', default='myuser'),
+            'PASSWORD': config('DB_PASSWORD', default='password'),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
 
 
 # Password validation
@@ -124,10 +141,14 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -136,6 +157,35 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000',
+    cast=Csv()
+)
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
+
+# CSRF Configuration for production
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000',
+    cast=Csv()
+)
+
+# Security settings for production
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_REDIRECT_EXEMPT = []
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -143,7 +193,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
          # By default, require authentication unless specified otherwise
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    )
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
@@ -184,4 +235,170 @@ SIMPLE_JWT = {
     "TOKEN_BLACKLIST_SERIALIZER": "rest_framework_simplejwt.serializers.TokenBlacklistSerializer",
     "SLIDING_TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainSlidingSerializer",
     "SLIDING_TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSlidingSerializer",
+}
+
+# DRF Spectacular Settings for API Documentation
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'DevGuidance API',
+    'DESCRIPTION': '''
+    # DevGuidance Mentorship Platform API
+    
+    A comprehensive REST API for the DevGuidance mentorship platform that connects students with experienced mentors in the tech industry.
+    
+    ## Features
+    - **User Management**: Student and mentor profile management
+    - **Authentication**: JWT-based secure authentication
+    - **Mentorship System**: Request and manage mentorship relationships
+    - **Project Showcase**: Students can showcase their projects
+    - **Real-time Messaging**: Communication between mentors and students
+    - **File Uploads**: Profile photos and document attachments
+    - **Search & Discovery**: Find mentors by expertise and experience
+    
+    ## Authentication
+    This API uses JWT (JSON Web Token) authentication. To access protected endpoints:
+    1. Register a new account or obtain tokens via `/api/token/`
+    2. Include the access token in the Authorization header: `Bearer <your_access_token>`
+    3. Refresh tokens when they expire using `/api/token/refresh/`
+    
+    ## Rate Limiting
+    - Registration: 5 requests per minute
+    - Token obtain: 5 requests per minute  
+    - Token refresh: 10 requests per minute
+    
+    ## File Uploads
+    - Profile photos: Max 2MB, JPEG/PNG/WebP formats
+    - Message attachments: Max 5MB, multiple formats supported
+    
+    ## Error Handling
+    The API returns standard HTTP status codes and detailed error messages in JSON format.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': '/api/',
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SORT_OPERATIONS': False,
+    
+    # Authentication schemes
+    'AUTHENTICATION_SCHEMES': [
+        {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+        }
+    ],
+    
+    # Security schemes
+    'SECURITY': [{'bearerAuth': []}],
+    
+    # Custom extensions
+    'EXTENSIONS_INFO': {
+        'x-logo': {
+            'url': 'https://example.com/logo.png',
+            'altText': 'DevGuidance Logo'
+        }
+    },
+    
+    # Contact and external docs
+    'CONTACT': {
+        'name': 'DevGuidance API Support',
+        'email': 'support@devguidance.com',
+        'url': 'https://devguidance.com/support',
+    },
+    'LICENSE': {
+        'name': 'MIT License',
+        'url': 'https://opensource.org/licenses/MIT',
+    },
+    'EXTERNAL_DOCS': {
+        'description': 'DevGuidance Documentation',
+        'url': 'https://docs.devguidance.com',
+    },
+    
+    # UI customization
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'defaultModelsExpandDepth': 2,
+        'defaultModelExpandDepth': 2,
+        'displayRequestDuration': True,
+        'docExpansion': 'list',
+        'filter': True,
+        'showExtensions': True,
+        'showCommonExtensions': True,
+    },
+    
+    # Redoc settings
+    'REDOC_UI_SETTINGS': {
+        'nativeScrollbars': False,
+        'theme': {
+            'colors': {
+                'primary': {
+                    'main': '#1976d2'
+                }
+            },
+            'typography': {
+                'fontSize': '14px',
+                'lineHeight': '1.5em',
+                'code': {
+                    'fontSize': '13px',
+                    'fontFamily': 'Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace'
+                }
+            }
+        }
+    },
+    
+    # Tags for grouping endpoints
+    'TAGS': [
+        {
+            'name': 'Authentication',
+            'description': 'User registration, login, and token management'
+        },
+        {
+            'name': 'Users', 
+            'description': 'User profile and account management'
+        },
+        {
+            'name': 'Students',
+            'description': 'Student profiles and project management'
+        },
+        {
+            'name': 'Mentors',
+            'description': 'Mentor profiles and expertise management'
+        },
+        {
+            'name': 'Mentorship',
+            'description': 'Mentorship requests and relationship management'
+        },
+        {
+            'name': 'Messages',
+            'description': 'Real-time messaging between users'
+        },
+        {
+            'name': 'Search',
+            'description': 'Search and discovery functionality'
+        }
+    ],
+    
+    # Preprocessing hooks
+    'PREPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.preprocess_exclude_path_format'
+    ],
+    
+    # Postprocessing hooks for customization
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums'
+    ],
+    
+    # Enum handling
+    'ENUM_NAME_OVERRIDES': {
+        'ValidationErrorEnum': 'drf_spectacular.plumbing.ValidationErrorEnum.choices',
+        'PasswordValidationErrorEnum': 'drf_spectacular.plumbing.PasswordValidationErrorEnum.choices',
+    },
+    
+    # Component naming
+    'COMPONENT_SPLIT_PATCH': True,
+    'COMPONENT_NO_READ_ONLY_REQUIRED': False,
+    
+    # Schema generation
+    'DISABLE_ERRORS_AND_WARNINGS': False,
 }

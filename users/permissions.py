@@ -26,14 +26,14 @@ class IsStudent(permissions.BasePermission):
     Permission to only allow students to access.
     """
     def has_permission(self, request, view):
-        return hasattr(request.user, 'student_profile')
+        return hasattr(request.user, 'students_profile')
 
 class IsMentor(permissions.BasePermission):
     """
     Permission to only allow mentors to access.
     """
     def has_permission(self, request, view):
-        return hasattr(request.user, 'mentor_profile')
+        return hasattr(request.user, 'mentors_profile')
 
 class CanManageRequest(permissions.BasePermission):
     """
@@ -44,23 +44,23 @@ class CanManageRequest(permissions.BasePermission):
         # For list/create endpoints
         if view.action == 'create':
             # Only students can create requests
-            return hasattr(request.user, 'student_profile')
+            return hasattr(request.user, 'students_profile')
         return True  # Other permissions will be checked in has_object_permission
     
     def has_object_permission(self, request, view, obj):
         # For retrieve/update/delete/accept/decline endpoints
         if view.action in ['retrieve', 'update', 'partial_update', 'destroy']:
             # Students can only manage their own requests
-            if hasattr(request.user, 'student_profile'):
+            if hasattr(request.user, 'students_profile'):
                 return obj.student == request.user
             # Mentors can only view requests sent to them
-            elif hasattr(request.user, 'mentor_profile'):
+            elif hasattr(request.user, 'mentors_profile'):
                 return obj.mentor == request.user
         
         # For accept/decline actions
         if view.action in ['accept', 'decline']:
             # Only mentors can accept/decline, and only their own requests
-            if hasattr(request.user, 'mentor_profile'):
+            if hasattr(request.user, 'mentors_profile'):
                 return obj.mentor == request.user
         
         return False 

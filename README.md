@@ -1,5 +1,25 @@
 # DevGuidance API Documentation
 
+## 🚀 New: Interactive API Documentation
+
+### Swagger UI
+Access the interactive API documentation at: `/api/docs/`
+- Test endpoints directly in the browser
+- View request/response schemas
+- Authentication support with JWT tokens
+
+### ReDoc
+Alternative documentation interface at: `/api/redoc/`
+- Clean, modern documentation layout
+- Better for reading and understanding the API
+- Mobile-friendly design
+
+### OpenAPI Schema
+Raw OpenAPI 3.0 schema available at: `/api/schema/`
+- Machine-readable API specification
+- Can be imported into API tools like Postman
+- Useful for generating client SDKs
+
 ## Installation Requirements
 
 The API requires the following dependencies:
@@ -10,6 +30,38 @@ The API requires the following dependencies:
   * python-magic or python-magic-bin (on Windows)
   * Pillow for image processing
   * djangorestframework-simplejwt for authentication
+  * drf-spectacular for API documentation
+
+## 🚀 Deployment
+
+### Render Deployment
+**Perfect for Django applications with integrated database support**
+
+Render provides excellent native support for Django applications with integrated PostgreSQL and easy configuration.
+
+**Quick Setup:**
+- **Tutorial**: [`RENDER_DEPLOYMENT.md`](RENDER_DEPLOYMENT.md)
+- **Checklist**: [`RENDER_DEPLOYMENT_CHECKLIST.md`](RENDER_DEPLOYMENT_CHECKLIST.md)
+- **Config Files**: `build.sh`, `render.yaml`
+
+**Why Render for Django:**
+✅ **Native Python Support** - Built specifically for Python web frameworks  
+✅ **Integrated PostgreSQL** - No need for external database providers  
+✅ **Simple Environment Management** - Easy configuration through dashboard  
+✅ **Automatic HTTPS** - SSL certificates automatically provisioned  
+✅ **Fair Pricing** - Good free tier with predictable costs  
+✅ **Built-in Monitoring** - Performance tracking and logging included  
+
+**Your API will be available at:** `https://your-service-name.onrender.com/`
+
+**Quick Deploy Steps:**
+1. Push your code to GitHub
+2. Create Render account at [dashboard.render.com](https://dashboard.render.com)
+3. Connect your repository and create Web Service
+4. Set environment variables in dashboard
+5. Deploy! 🎉
+
+**For detailed deployment comparison with other platforms, see:** [`DEPLOYMENT_COMPARISON.md`](DEPLOYMENT_COMPARISON.md)
 
 ## Rate Limiting
 
@@ -387,5 +439,4 @@ for i in {1..6}; do
   echo -e "\n"
   sleep 1
 done
-```
 ```

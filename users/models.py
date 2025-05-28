@@ -204,3 +204,4 @@ class Message(models.Model):
         if self.file:
             return self.file.url
         return None
+    is_read = models.BooleanField(default=False) 

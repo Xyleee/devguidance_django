@@ -1,0 +1,308 @@
+================================================================================
+                        DEVGUIDANCE MENTORSHIP PLATFORM
+                         ENTITY RELATIONSHIP DIAGRAM (ERD)
+================================================================================
+
+                           DATABASE SCHEMA OVERVIEW
+                           
+This ERD shows the complete database schema for the DevGuidance mentorship 
+platform, including all entities, attributes, relationships, and constraints.
+
+================================================================================
+                                 ENTITIES
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                   USER                                      │
+│                            (Django Built-in)                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • username (CharField, max_length=150, unique=True)                      │
+│   • email (EmailField, unique=True)                                        │
+│   • first_name (CharField, max_length=150)                                 │
+│   • last_name (CharField, max_length=150)                                  │
+│   • password (CharField, max_length=128, hashed)                           │
+│   • is_active (BooleanField, default=True)                                 │
+│   • is_staff (BooleanField, default=False)                                 │
+│   • is_superuser (BooleanField, default=False)                             │
+│   • date_joined (DateTimeField, auto_now_add=True)                         │
+│   • last_login (DateTimeField, nullable=True)                              │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • One-to-One with StudentProfile (optional)                              │
+│   • One-to-One with MentorProfile (optional)                               │
+│   • One-to-Many with MentorshipRequest (as student)                        │
+│   • One-to-Many with MentorshipRequest (as mentor)                         │
+│   • One-to-Many with Message (as sender)                                   │
+│   • One-to-Many with Message (as receiver)                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              STUDENT PROFILE                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│ 🔑 FOREIGN KEY: user_id → User.id (OneToOneField)                          │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • name (CharField, max_length=100)                                       │
+│   • bio (TextField, blank=True)                                            │
+│   • year_level (IntegerField, default=1)                                   │
+│   • tech_stack (JSONField, default=list) - Array of technologies           │
+│   • photo (ImageField, upload_to='profile_photos/student/', optional)      │
+│   • created_at (DateTimeField, auto_now_add=True)                          │
+│   • updated_at (DateTimeField, auto_now=True)                              │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • One-to-One with User                                                   │
+│   • One-to-Many with StudentProject                                        │
+│                                                                             │
+│ ⚙️  BUSINESS LOGIC:                                                         │
+│   • Photo automatically cropped to 1:1 aspect ratio                        │
+│   • Tech stack stored as JSON array for flexibility                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              STUDENT PROJECT                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│ 🔑 FOREIGN KEY: student_id → StudentProfile.id (ForeignKey)                │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • title (CharField, max_length=100)                                      │
+│   • description (TextField)                                                │
+│   • tools_used (JSONField, default=list) - Array of tools/technologies     │
+│   • created_at (DateTimeField, auto_now_add=True)                          │
+│   • updated_at (DateTimeField, auto_now=True)                              │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • Many-to-One with StudentProfile                                        │
+│                                                                             │
+│ ⚙️  BUSINESS LOGIC:                                                         │
+│   • Only the project owner (student) can modify/delete                     │
+│   • Tools stored as JSON for search flexibility                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                               MENTOR PROFILE                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│ 🔑 FOREIGN KEY: user_id → User.id (OneToOneField)                          │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • name (CharField, max_length=100)                                       │
+│   • bio (TextField, blank=True)                                            │
+│   • experience_years (IntegerField, default=0)                             │
+│   • expertise_tags (JSONField, default=list) - Array of expertise areas    │
+│   • photo (ImageField, upload_to='profile_photos/mentor/', optional)       │
+│   • created_at (DateTimeField, auto_now_add=True)                          │
+│   • updated_at (DateTimeField, auto_now=True)                              │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • One-to-One with User                                                   │
+│   • One-to-Many with MentorshipRequest (as mentor)                         │
+│                                                                             │
+│ ⚙️  BUSINESS LOGIC:                                                         │
+│   • Photo automatically cropped to 1:1 aspect ratio                        │
+│   • Expertise tags used for mentor discovery and matching                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            MENTORSHIP REQUEST                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│ 🔑 FOREIGN KEY: student_id → User.id (related_name='sent_requests')        │
+│ 🔑 FOREIGN KEY: mentor_id → User.id (related_name='received_requests')     │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • status (CharField, choices=['pending', 'accepted', 'declined'])        │
+│   • message (TextField, blank=True) - Student's request message            │
+│   • rejection_reason (TextField, blank=True) - Mentor's rejection reason   │
+│   • created_at (DateTimeField, auto_now_add=True)                          │
+│   • updated_at (DateTimeField, auto_now=True)                              │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • Many-to-One with User (as student)                                     │
+│   • Many-to-One with User (as mentor)                                      │
+│                                                                             │
+│ 🚨 CONSTRAINTS:                                                             │
+│   • UniqueConstraint: (student, mentor) WHERE status IN ('pending', 'accepted') │
+│   • Prevents duplicate active requests between same student-mentor pair     │
+│                                                                             │
+│ ⚙️  BUSINESS LOGIC:                                                         │
+│   • When accepted, all other pending requests from student are declined    │
+│   • Students can only have one active mentorship at a time                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                 MESSAGE                                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 📋 PRIMARY KEY: id (Integer, Auto-increment)                               │
+│ 🔑 FOREIGN KEY: sender_id → User.id (related_name='sent_messages')         │
+│ 🔑 FOREIGN KEY: receiver_id → User.id (related_name='received_messages')   │
+│                                                                             │
+│ 📄 ATTRIBUTES:                                                              │
+│   • content (TextField, blank=True) - Message text content                 │
+│   • file (FileField, upload_to='message_files/', optional)                 │
+│   • timestamp (DateTimeField, auto_now_add=True)                           │
+│   • is_read (BooleanField, default=False)                                  │
+│                                                                             │
+│ 🔗 RELATIONSHIPS:                                                           │
+│   • Many-to-One with User (as sender)                                      │
+│   • Many-to-One with User (as receiver)                                    │
+│                                                                             │
+│ 📎 FILE VALIDATION:                                                         │
+│   • Max file size: 5MB                                                     │
+│   • Allowed formats: PDF, DOCX, XLSX, PPTX, TXT, CSV, PNG, JPEG, GIF       │
+│                                                                             │
+│ ⚙️  BUSINESS LOGIC:                                                         │
+│   • Real-time messaging with Server-Sent Events                            │
+│   • Read status tracking                                                   │
+│   • File attachment support                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                            RELATIONSHIP DIAGRAM
+================================================================================
+
+                                    USER
+                             (Central Entity)
+                                     │
+                    ┌────────────────┼────────────────┐
+                    │                │                │
+                    ▼                ▼                ▼
+            ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+            │StudentProfile│  │MentorProfile│  │   Message   │
+            │    (1:1)    │  │    (1:1)    │  │   (1:M x2)  │
+            └─────────────┘  └─────────────┘  └─────────────┘
+                    │                              │
+                    ▼                              │
+            ┌─────────────┐                        │
+            │StudentProject│                       │
+            │    (1:M)    │                       │
+            └─────────────┘                        │
+                                                   │
+                              ┌─────────────┐     │
+                              │MentorshipReq│◄────┘
+                              │   (M:1 x2)  │
+                              └─────────────┘
+
+================================================================================
+                              KEY RELATIONSHIPS
+================================================================================
+
+1. USER ↔ STUDENT PROFILE (One-to-One)
+   • Each user can have one student profile
+   • Profile extends user with student-specific data
+
+2. USER ↔ MENTOR PROFILE (One-to-One)  
+   • Each user can have one mentor profile
+   • Profile extends user with mentor-specific data
+
+3. STUDENT PROFILE → STUDENT PROJECT (One-to-Many)
+   • Each student can have multiple projects
+   • Projects belong to one student
+
+4. USER → MENTORSHIP REQUEST (One-to-Many, bidirectional)
+   • As Student: User can send multiple mentorship requests
+   • As Mentor: User can receive multiple mentorship requests
+
+5. USER → MESSAGE (One-to-Many, bidirectional)
+   • As Sender: User can send multiple messages
+   • As Receiver: User can receive multiple messages
+
+================================================================================
+                               BUSINESS RULES
+================================================================================
+
+🔐 AUTHENTICATION & AUTHORIZATION:
+   • JWT-based authentication with access/refresh tokens
+   • Role-based permissions (Student, Mentor, Owner)
+   • Rate limiting on authentication endpoints
+
+👥 USER MANAGEMENT:
+   • Users can be either Students OR Mentors (not both)
+   • Profile creation is automatic on user registration
+   • Unique usernames and emails enforced
+
+📝 MENTORSHIP WORKFLOW:
+   • Students browse mentors by expertise
+   • Students send mentorship requests with messages
+   • Mentors can accept/decline with optional reasons
+   • Only one active mentorship per student
+   • Accepting a request auto-declines others
+
+💬 MESSAGING SYSTEM:
+   • Real-time messaging between users
+   • File attachments with validation
+   • Message history and read status
+   • Only connected users can message
+
+📊 DATA INTEGRITY:
+   • Cascade deletes prevent orphaned records
+   • Unique constraints prevent duplicates
+   • JSON fields for flexible data storage
+   • Automatic timestamps for audit trails
+
+================================================================================
+                            INDEXING STRATEGY
+================================================================================
+
+🚀 PERFORMANCE OPTIMIZATION:
+
+PRIMARY INDEXES (Auto-created):
+   • User.id, StudentProfile.id, MentorProfile.id, etc.
+
+UNIQUE INDEXES:
+   • User.username, User.email (Django built-in)
+   • (StudentProfile.user_id), (MentorProfile.user_id)
+
+RECOMMENDED CUSTOM INDEXES:
+   • MentorshipRequest.status (for filtering)
+   • MentorshipRequest.student + MentorshipRequest.mentor (composite)
+   • Message.timestamp (for ordering)
+   • Message.sender + Message.receiver (for conversations)
+   • StudentProfile.tech_stack (GIN index for JSON queries)
+   • MentorProfile.expertise_tags (GIN index for JSON queries)
+
+================================================================================
+                          DATABASE NORMALIZATION
+================================================================================
+
+✅ FIRST NORMAL FORM (1NF):
+   • All attributes contain atomic values
+   • No repeating groups or arrays in scalar fields
+   • JSON fields used appropriately for complex data
+
+✅ SECOND NORMAL FORM (2NF):
+   • All non-key attributes fully depend on primary keys
+   • No partial dependencies exist
+
+✅ THIRD NORMAL FORM (3NF):
+   • No transitive dependencies
+   • All non-key attributes depend only on primary keys
+
+📈 BENEFITS OF NORMALIZATION:
+   • Eliminates data redundancy
+   • Prevents update anomalies
+   • Ensures data consistency
+   • Supports efficient queries
+   • Maintains referential integrity
+
+================================================================================
+                                SUMMARY
+================================================================================
+
+📊 TOTAL ENTITIES: 6 (User + 5 custom models)
+🔗 TOTAL RELATIONSHIPS: 7 different relationship types
+📋 CRUD OPERATIONS: Full CRUD on all entities
+🔐 SECURITY: JWT authentication + role-based permissions
+🎯 BUSINESS LOGIC: Comprehensive mentorship workflow
+📈 SCALABILITY: Normalized design with performance indexes
+
+This ERD represents a well-designed, normalized database schema that supports
+the complete mentorship platform functionality while maintaining data integrity,
+performance, and scalability.
+
+================================================================================ 
