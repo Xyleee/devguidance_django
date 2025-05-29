@@ -5,7 +5,8 @@ from .models import StudentProfile, StudentProject, MentorProfile, MentorshipReq
 from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import ValidationError
 import os
-import magic
+from PIL import Image
+import imghdr
 
 class PhotoValidationMixin:
     """Mixin for validating photo uploads"""
@@ -18,16 +19,54 @@ class PhotoValidationMixin:
         if photo.size > 2 * 1024 * 1024:  # 2MB in bytes
             raise serializers.ValidationError("Image file too large. Maximum size is 2MB.")
             
-        # Validate file type
-        mime = magic.Magic(mime=True)
-        file_type = mime.from_buffer(photo.read())
-        photo.seek(0)  # Reset file pointer after reading
+        # Validate file type using multiple methods for better compatibility
+        valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+        valid_content_types = ['image/jpeg', 'image/png', 'image/webp']
         
-        valid_types = ['image/jpeg', 'image/png', 'image/webp']
-        if file_type not in valid_types:
+        # Check file extension
+        file_extension = os.path.splitext(photo.name)[1].lower()
+        if file_extension not in valid_extensions:
             raise serializers.ValidationError(
                 "Invalid image format. Only JPEG, PNG, and WebP are supported."
             )
+        
+        # Check content type
+        if hasattr(photo, 'content_type') and photo.content_type:
+            if photo.content_type not in valid_content_types:
+                raise serializers.ValidationError(
+                    "Invalid image format. Only JPEG, PNG, and WebP are supported."
+                )
+        
+        # Additional validation using imghdr (built-in Python module)
+        try:
+            # Reset file pointer
+            photo.seek(0)
+            # Read a small portion for validation
+            header = photo.read(32)
+            photo.seek(0)
+            
+            # Use imghdr to detect image type
+            image_type = imghdr.what(None, h=header)
+            if image_type not in ['jpeg', 'png', 'webp']:
+                raise serializers.ValidationError(
+                    "Invalid image format. Only JPEG, PNG, and WebP are supported."
+                )
+        except Exception:
+            # If imghdr fails, try using Pillow as fallback
+            try:
+                photo.seek(0)
+                with Image.open(photo) as img:
+                    # Verify it's a valid image and get format
+                    img.verify()
+                    if img.format.lower() not in ['jpeg', 'png', 'webp']:
+                        raise serializers.ValidationError(
+                            "Invalid image format. Only JPEG, PNG, and WebP are supported."
+                        )
+                photo.seek(0)  # Reset file pointer after verification
+            except Exception:
+                raise serializers.ValidationError(
+                    "Invalid image file. Please upload a valid JPEG, PNG, or WebP image."
+                )
             
         return photo
 
@@ -277,28 +316,46 @@ class FileValidationMixin:
         if not file:
             return file
             
-        # Validate file size (2MB max)
-        if file.size > 2 * 1024 * 1024:  # 2MB in bytes
-            raise serializers.ValidationError("File too large. Maximum size is 2MB.")
+        # Validate file size (5MB max for message files)
+        if file.size > 5 * 1024 * 1024:  # 5MB in bytes
+            raise serializers.ValidationError("File too large. Maximum size is 5MB.")
             
-        # Validate file type
-        mime = magic.Magic(mime=True)
-        file_type = mime.from_buffer(file.read())
-        file.seek(0)  # Reset file pointer after reading
+        # Validate file type using file extension and content type
+        valid_extensions = [
+            # Images
+            '.jpg', '.jpeg', '.png', '.webp', '.gif',
+            # Documents
+            '.pdf', '.doc', '.docx', '.txt', '.rtf',
+            # Others
+            '.zip', '.csv', '.xlsx', '.pptx'
+        ]
         
-        valid_types = [
+        valid_content_types = [
             # Images
             'image/jpeg', 'image/png', 'image/webp', 'image/gif',
             # Documents
             'application/pdf', 'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain', 'application/rtf'
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain', 'application/rtf',
+            # Others
+            'application/zip', 'text/csv'
         ]
         
-        if file_type not in valid_types:
+        # Check file extension
+        file_extension = os.path.splitext(file.name)[1].lower()
+        if file_extension not in valid_extensions:
             raise serializers.ValidationError(
-                "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF."
+                "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF, ZIP, CSV, XLSX, PPTX."
             )
+        
+        # Check content type if available
+        if hasattr(file, 'content_type') and file.content_type:
+            if file.content_type not in valid_content_types:
+                raise serializers.ValidationError(
+                    "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF, ZIP, CSV, XLSX, PPTX."
+                )
             
         return file
 
