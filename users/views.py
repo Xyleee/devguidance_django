@@ -224,7 +224,7 @@ class ProtectedView(APIView):
 
 @extend_schema_view(
     post=extend_schema(
-        operation_id='send_message',
+        operation_id='send_new_message',
         tags=['Messages'],
         summary='Send a message',
         description='''
@@ -312,9 +312,9 @@ class ProtectedView(APIView):
         ]
     ),
     get=extend_schema(
-        operation_id='get_message_history',
+        operation_id='get_conversation_history',
         tags=['Messages'],
-        summary='Get message history',
+        summary='Get conversation history',
         description='''
         Retrieve message history between the authenticated user and another user.
         
@@ -473,6 +473,42 @@ class MessageAPIView(APIView):
         
         return mentorship_exists
 
+@extend_schema(
+    operation_id='stream_messages',
+    tags=['Messages'],
+    summary='Stream real-time messages',
+    description='''
+    Stream real-time messages for a conversation using Server-Sent Events (SSE).
+    
+    **Features:**
+    - Real-time message delivery
+    - Automatic connection management
+    - Validates messaging permissions
+    - Server-Sent Events for live updates
+    ''',
+    parameters=[
+        OpenApiParameter(
+            name='user_id',
+            description='ID of the other user in the conversation',
+            required=True,
+            type=int,
+            location=OpenApiParameter.PATH
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            description='SSE stream established',
+            examples=[
+                OpenApiExample(
+                    'Stream Response',
+                    value="data: {\"id\": 1, \"content\": \"Hello!\", \"timestamp\": \"2024-01-15T10:00:00Z\"}\n\n"
+                )
+            ]
+        ),
+        403: OpenApiResponse(description='Permission denied - invalid messaging pair'),
+        404: OpenApiResponse(description='User not found')
+    }
+)
 class MessageStreamView(APIView):
     permission_classes = [IsAuthenticated, IsMessageAllowed]
     
@@ -552,6 +588,45 @@ def test_endpoint(request):
             'data': dict(request.POST)
         })
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id='test_api_get',
+        tags=['Testing'],
+        summary='Test API endpoint (GET)',
+        description='Simple test endpoint to verify API connectivity',
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    name='TestResponse',
+                    fields={
+                        'message': OpenApiTypes.STR,
+                        'user': OpenApiTypes.STR,
+                        'time': OpenApiTypes.DATETIME
+                    }
+                ),
+                description='Test response'
+            )
+        }
+    ),
+    post=extend_schema(
+        operation_id='test_api_post',
+        tags=['Testing'],
+        summary='Test API endpoint (POST)',
+        description='Simple test endpoint to verify POST request handling',
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    name='TestPostResponse',
+                    fields={
+                        'message': OpenApiTypes.STR,
+                        'data': OpenApiTypes.OBJECT
+                    }
+                ),
+                description='Test POST response'
+            )
+        }
+    )
+)
 class SimpleTestView(APIView):
     """Simple API test view"""
     permission_classes = [AllowAny]

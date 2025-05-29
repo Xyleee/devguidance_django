@@ -158,17 +158,47 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
+# Add production URLs for hosted environment
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:8000",  # Add this if testing from same port
+    "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://devguidance-django.onrender.com",  # Your Render backend URL
+    # Add common frontend hosting URLs (update these with your actual frontend URLs)
+    "https://devguidance-frontend.vercel.app",
+    "https://devguidance-frontend.netlify.app", 
+    "https://devguidance.netlify.app",
+    "https://devguidance.vercel.app",
 ]
 
 # For development, you can temporarily allow all origins
-CORS_ALLOW_ALL_ORIGINS = True  # Set to True temporarily for testing
+# Only enable for development - disable in production for security
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only allow all origins in development
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS headers needed for API
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Also add to CSRF trusted origins
 CSRF_TRUSTED_ORIGINS = [
@@ -176,6 +206,12 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:3000',
     'http://localhost:3000',
+    'https://devguidance-django.onrender.com',  # Your Render backend URL
+    # Add frontend URLs
+    'https://devguidance-frontend.vercel.app',
+    'https://devguidance-frontend.netlify.app',
+    'https://devguidance.netlify.app', 
+    'https://devguidance.vercel.app',
 ]
 
 # Security settings for production
