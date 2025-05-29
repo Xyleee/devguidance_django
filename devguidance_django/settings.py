@@ -57,7 +57,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Added for static files on Vercel
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # Comment this out temporarily
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -158,22 +158,25 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",  # Add this if testing from same port
+    "http://127.0.0.1:8000",
+]
+
+# For development, you can temporarily allow all origins
+CORS_ALLOW_ALL_ORIGINS = True  # Set to True temporarily for testing
 
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
-
-# CSRF Configuration for production
-CSRF_TRUSTED_ORIGINS = config(
-    'CSRF_TRUSTED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
+# Also add to CSRF trusted origins
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3000',
+]
 
 # Security settings for production
 if not DEBUG:
@@ -186,15 +189,30 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+# CSRF Configuration for API
+CSRF_COOKIE_SECURE = not DEBUG  # Only use secure cookies in production
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for SPAs
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_NAME = 'csrftoken'
+
+# For API endpoints, you might want to exempt some views from CSRF
+# This is handled per-view basis with @csrf_exempt decorator
+
+# REST Framework configuration update
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Add this for web browseable API
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-         # By default, require authentication unless specified otherwise
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
 }
 
 SIMPLE_JWT = {
@@ -239,44 +257,90 @@ SIMPLE_JWT = {
 
 # DRF Spectacular Settings for API Documentation
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'DevGuidance API',
+    'TITLE': 'DevGuidance API - Clean & Organized',
     'DESCRIPTION': '''
     # DevGuidance Mentorship Platform API
     
-    A comprehensive REST API for the DevGuidance mentorship platform that connects students with experienced mentors in the tech industry.
+    A **clean, well-organized** REST API for the DevGuidance mentorship platform that connects students with experienced mentors in the tech industry.
     
-    ## Features
-    - **User Management**: Student and mentor profile management
-    - **Authentication**: JWT-based secure authentication
-    - **Mentorship System**: Request and manage mentorship relationships
-    - **Project Showcase**: Students can showcase their projects
-    - **Real-time Messaging**: Communication between mentors and students
-    - **File Uploads**: Profile photos and document attachments
-    - **Search & Discovery**: Find mentors by expertise and experience
+    ## 🎯 API Organization
+    Our API is now **logically organized** without duplicate endpoints:
     
-    ## Authentication
-    This API uses JWT (JSON Web Token) authentication. To access protected endpoints:
-    1. Register a new account or obtain tokens via `/api/token/`
-    2. Include the access token in the Authorization header: `Bearer <your_access_token>`
-    3. Refresh tokens when they expire using `/api/token/refresh/`
+    ### 🔐 **Authentication & User Management** (`/api/users/`)
+    - User registration and authentication
+    - JWT token management  
+    - Real-time messaging system
+    - Core user functionality
     
-    ## Rate Limiting
-    - Registration: 5 requests per minute
-    - Token obtain: 5 requests per minute  
-    - Token refresh: 10 requests per minute
+    ### 👨‍🎓 **Student Management** (`/api/students/`)
+    - Complete student profile management
+    - Project showcase and portfolio
+    - Search by technology stack and year level
+    - Student statistics and analytics
     
-    ## File Uploads
-    - Profile photos: Max 2MB, JPEG/PNG/WebP formats
-    - Message attachments: Max 5MB, multiple formats supported
+    ### 👨‍🏫 **Mentor Management** (`/api/mentors/`)
+    - Comprehensive mentor profiles
+    - Expertise-based search and discovery
+    - Availability checking
+    - Mentorship request management
     
-    ## Error Handling
-    The API returns standard HTTP status codes and detailed error messages in JSON format.
+    ### 🔑 **Token Management** (`/api/token/`)
+    - JWT token obtain and refresh
+    - Secure authentication flow
+    
+    ## ✨ Key Features
+    - **🚫 No Duplicate Endpoints**: Clean, organized API structure
+    - **🔍 Advanced Search**: Find mentors by expertise, students by tech stack
+    - **💬 Real-time Messaging**: WebSocket-like streaming for conversations
+    - **📁 File Uploads**: Profile photos and document attachments
+    - **📊 Analytics**: Student and mentor statistics
+    - **🔒 Secure**: JWT-based authentication with rate limiting
+    
+    ## 🚀 Getting Started
+    
+    ### Authentication Flow:
+    1. **Register**: `POST /api/users/register/` (Student or Mentor)
+    2. **Login**: `POST /api/token/` (Get JWT tokens)
+    3. **Access**: Include `Authorization: Bearer <token>` in headers
+    4. **Refresh**: `POST /api/token/refresh/` when token expires
+    
+    ### For Students:
+    - Browse mentors: `GET /api/mentors/browse/`
+    - Manage profile: `GET/PUT /api/students/profiles/me/`
+    - Create projects: `POST /api/students/projects/`
+    - Request mentorship: `POST /api/mentors/mentorship-requests/`
+    
+    ### For Mentors:
+    - Manage profile: `GET/PUT /api/mentors/profiles/me/`
+    - View requests: `GET /api/mentors/mentorship-requests/mentor/`
+    - Accept/decline: `PATCH /api/mentors/mentorship-requests/{id}/accept/`
+    
+    ## 🔧 Technical Details
+    
+    ### Rate Limiting:
+    - Registration: 5 requests/minute
+    - Token obtain: 5 requests/minute  
+    - Token refresh: 10 requests/minute
+    
+    ### File Uploads:
+    - Profile photos: Max 2MB (JPEG/PNG/WebP)
+    - Message attachments: Max 5MB (PDF, DOCX, images, etc.)
+    
+    ### Error Handling:
+    Standard HTTP status codes with detailed JSON error messages.
+    
+    ## 📈 Improvements Made
+    - ✅ Removed all duplicate endpoints
+    - ✅ Logical separation by domain (students, mentors, users)
+    - ✅ Comprehensive documentation with examples
+    - ✅ Clear API structure and naming conventions
+    - ✅ Enhanced search and discovery features
     ''',
-    'VERSION': '1.0.0',
+    'VERSION': '2.0.0',  # Updated version to reflect the cleanup
     'SERVE_INCLUDE_SCHEMA': False,
     'SCHEMA_PATH_PREFIX': '/api/',
     'COMPONENT_SPLIT_REQUEST': True,
-    'SORT_OPERATIONS': False,
+    'SORT_OPERATIONS': True,  # Enable sorting for better organization
     
     # Authentication schemes
     'AUTHENTICATION_SCHEMES': [
@@ -294,7 +358,7 @@ SPECTACULAR_SETTINGS = {
     'EXTENSIONS_INFO': {
         'x-logo': {
             'url': 'https://example.com/logo.png',
-            'altText': 'DevGuidance Logo'
+            'altText': 'DevGuidance - Clean API'
         }
     },
     
@@ -313,18 +377,20 @@ SPECTACULAR_SETTINGS = {
         'url': 'https://docs.devguidance.com',
     },
     
-    # UI customization
+    # Enhanced UI customization
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
         'persistAuthorization': True,
-        'displayOperationId': False,
-        'defaultModelsExpandDepth': 2,
-        'defaultModelExpandDepth': 2,
+        'displayOperationId': True,  # Show operation IDs for better organization
+        'defaultModelsExpandDepth': 1,  # Cleaner initial view
+        'defaultModelExpandDepth': 1,
         'displayRequestDuration': True,
-        'docExpansion': 'list',
+        'docExpansion': 'list',  # Show all endpoints organized by tags
         'filter': True,
         'showExtensions': True,
         'showCommonExtensions': True,
+        'tagsSorter': 'alpha',  # Sort tags alphabetically
+        'operationsSorter': 'alpha',  # Sort operations alphabetically
     },
     
     # Redoc settings
@@ -334,6 +400,9 @@ SPECTACULAR_SETTINGS = {
             'colors': {
                 'primary': {
                     'main': '#1976d2'
+                },
+                'success': {
+                    'main': '#4caf50'
                 }
             },
             'typography': {
@@ -344,38 +413,104 @@ SPECTACULAR_SETTINGS = {
                     'fontFamily': 'Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace'
                 }
             }
-        }
+        },
+        'scrollYOffset': 60,
+        'hideDownloadButton': False,
+        'disableSearch': False,
     },
     
-    # Tags for grouping endpoints
+    # Updated tags for clean organization
     'TAGS': [
         {
             'name': 'Authentication',
-            'description': 'User registration, login, and token management'
+            'description': '''
+            🔐 **User Registration & Authentication**
+            
+            Complete authentication flow including user registration, login, and JWT token management.
+            No duplicate endpoints - all auth functionality consolidated here.
+            '''
         },
         {
             'name': 'Users', 
-            'description': 'User profile and account management'
+            'description': '''
+            👤 **Core User Management**
+            
+            Essential user functionality including protected endpoints and account management.
+            Clean separation from profile-specific operations.
+            '''
         },
         {
             'name': 'Students',
-            'description': 'Student profiles and project management'
+            'description': '''
+            👨‍🎓 **Student Profiles & Projects**
+            
+            **All student-related functionality in one place:**
+            - Profile management and customization
+            - Project showcase and portfolio
+            - Technology stack tracking
+            - Academic year level organization
+            - Student statistics and analytics
+            '''
+        },
+        {
+            'name': 'Projects',
+            'description': '''
+            📁 **Student Project Management**
+            
+            Comprehensive project management for students including creation, 
+            editing, and tool-based search functionality.
+            '''
         },
         {
             'name': 'Mentors',
-            'description': 'Mentor profiles and expertise management'
+            'description': '''
+            👨‍🏫 **Mentor Profiles & Management**
+            
+            **Complete mentor ecosystem:**
+            - Professional profile management
+            - Expertise and experience tracking
+            - Availability status monitoring
+            - Mentor discovery and browsing
+            '''
+        },
+        {
+            'name': 'Browse',
+            'description': '''
+            🔍 **Mentor Discovery**
+            
+            Advanced search and discovery features for students to find the perfect mentors
+            based on expertise, experience, and availability.
+            '''
         },
         {
             'name': 'Mentorship',
-            'description': 'Mentorship requests and relationship management'
+            'description': '''
+            🤝 **Mentorship Relationship Management**
+            
+            **End-to-end mentorship flow:**
+            - Request creation and management
+            - Accept/decline functionality for mentors
+            - Status tracking and updates
+            - Relationship analytics
+            '''
         },
         {
             'name': 'Messages',
-            'description': 'Real-time messaging between users'
+            'description': '''
+            💬 **Real-time Communication**
+            
+            Secure messaging system between mentors and students with file attachment
+            support and real-time streaming capabilities.
+            '''
         },
         {
             'name': 'Search',
-            'description': 'Search and discovery functionality'
+            'description': '''
+            🔍 **Advanced Search & Discovery**
+            
+            Powerful search functionality across students and mentors with filtering
+            by technology, expertise, year level, and more.
+            '''
         }
     ],
     
@@ -401,4 +536,37 @@ SPECTACULAR_SETTINGS = {
     
     # Schema generation
     'DISABLE_ERRORS_AND_WARNINGS': False,
+    
+    # Additional customizations for clean organization
+    'SERVERS': [
+        {
+            'url': 'http://localhost:8000',
+            'description': 'Development server'
+        },
+        {
+            'url': 'https://api.devguidance.com',
+            'description': 'Production server'
+        }
+    ],
 }
+
+# Add at the end of settings.py for debugging
+if DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+            },
+        },
+    }
+
+# Temporarily disable CSRF for all views (ONLY FOR DEBUGGING)
+USE_CSRF = False

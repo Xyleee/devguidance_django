@@ -4,37 +4,28 @@ from . import views
 from .views import (
     RegisterView, 
     ProtectedView, 
-    StudentProfileViewSet, 
-    MentorProfileViewSet,
-    StudentProjectViewSet,
-    MentorshipRequestViewSet,
-    MentorListView,
     MessageAPIView,
     MessageStreamView,
     RateLimitedRegisterView,
     RateLimitedTokenObtainPairView,
-    RateLimitedTokenRefreshView
+    RateLimitedTokenRefreshView,
+    SimpleTestView
 )
 
 app_name = 'users'
 
-# Create a router and register our viewsets with it
+# Remove duplicated router registrations - these will be handled in their respective apps
 router = DefaultRouter()
-router.register(r'student-profiles', StudentProfileViewSet, basename='student-profile')
-router.register(r'mentor-profiles', MentorProfileViewSet, basename='mentor-profile')
-router.register(r'student-projects', StudentProjectViewSet, basename='student-project')
-router.register(r'mentorship-requests', MentorshipRequestViewSet, basename='mentorship-request')
 
 urlpatterns = [
     path('', views.home, name='home'),
-    path('register/', RegisterView.as_view(), name='auth_register'),
+    path('register/', RateLimitedRegisterView.as_view(), name='register'),
     path('protected/', ProtectedView.as_view(), name='protected_view'),
-    path('api/', include(router.urls)),
-    path('api/mentors/', MentorListView.as_view(), name='mentor-list'),
+    # Remove the duplicated API routes
     path('messages/', MessageAPIView.as_view(), name='send_message'),
     path('messages/<int:user_id>/', MessageAPIView.as_view(), name='message_history'),
     path('messages/stream/<int:user_id>/', MessageStreamView.as_view(), name='message_stream'),
-    path('api/register/', RateLimitedRegisterView.as_view(), name='register'),
-    path('api/token/', RateLimitedTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', RateLimitedTokenRefreshView.as_view(), name='token_refresh'),
+    path('test/', views.test_endpoint, name='test'),
+    path('api-test/', SimpleTestView.as_view(), name='api-test'),
+    path('simple/', views.super_simple_test, name='simple'),
 ]

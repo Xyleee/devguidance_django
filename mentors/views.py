@@ -13,6 +13,64 @@ from users.permissions import IsOwnerOrReadOnly, IsStudent, IsMentor
 from .permissions import CanManageRequest
 from django.db.models import Q
 
+# DRF Spectacular imports for API documentation
+from drf_spectacular.utils import (
+    extend_schema, 
+    extend_schema_view, 
+    OpenApiParameter, 
+    OpenApiExample,
+    OpenApiResponse,
+    inline_serializer
+)
+from drf_spectacular.types import OpenApiTypes
+
+@extend_schema_view(
+    list=extend_schema(
+        operation_id='list_mentor_profiles',
+        tags=['Mentors'],
+        summary='List mentor profiles',
+        description='Get a list of mentor profiles with search functionality',
+        parameters=[
+            OpenApiParameter(
+                name='search',
+                description='Search mentors by name or expertise tags',
+                required=False,
+                type=str,
+                location=OpenApiParameter.QUERY
+            )
+        ]
+    ),
+    create=extend_schema(
+        operation_id='create_mentor_profile',
+        tags=['Mentors'],
+        summary='Create mentor profile',
+        description='Create a new mentor profile for the authenticated user'
+    ),
+    retrieve=extend_schema(
+        operation_id='get_mentor_profile',
+        tags=['Mentors'],
+        summary='Get mentor profile',
+        description='Retrieve a specific mentor profile by ID'
+    ),
+    update=extend_schema(
+        operation_id='update_mentor_profile',
+        tags=['Mentors'],
+        summary='Update mentor profile',
+        description='Update a mentor profile (full update)'
+    ),
+    partial_update=extend_schema(
+        operation_id='partial_update_mentor_profile',
+        tags=['Mentors'],
+        summary='Partially update mentor profile',
+        description='Partially update a mentor profile'
+    ),
+    destroy=extend_schema(
+        operation_id='delete_mentor_profile',
+        tags=['Mentors'],
+        summary='Delete mentor profile',
+        description='Delete a mentor profile'
+    )
+)
 class MentorProfileViewSet(viewsets.ModelViewSet):
     serializer_class = MentorProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
@@ -32,6 +90,16 @@ class MentorProfileViewSet(viewsets.ModelViewSet):
         # For retrieve, use the pk from the URL
         return super().get_object()
     
+    @extend_schema(
+        operation_id='get_my_mentor_profile',
+        tags=['Mentors'],
+        summary='Get my mentor profile',
+        description='Retrieve the mentor profile of the authenticated user',
+        responses={
+            200: MentorProfileSerializer,
+            404: OpenApiResponse(description='Profile not found')
+        }
+    )
     @action(detail=False, methods=['get'])
     def me(self, request):
         try:
@@ -41,6 +109,30 @@ class MentorProfileViewSet(viewsets.ModelViewSet):
         except MentorProfile.DoesNotExist:
             return Response({"detail": "Profile not found"}, status=status.HTTP_404_NOT_FOUND)
             
+    @extend_schema(
+        operation_id='find_mentors_by_expertise',
+        tags=['Mentors', 'Search'],
+        summary='Find mentors by expertise',
+        description='Find mentor profiles that have a specific expertise tag',
+        parameters=[
+            OpenApiParameter(
+                name='tag',
+                description='Expertise tag to search for (e.g., "Python", "Web Development", "Mobile")',
+                required=True,
+                type=str,
+                location=OpenApiParameter.QUERY,
+                examples=[
+                    OpenApiExample('Python', value='Python'),
+                    OpenApiExample('Web Development', value='Web Development'),
+                    OpenApiExample('Mobile', value='Mobile')
+                ]
+            )
+        ],
+        responses={
+            200: MentorProfileSerializer(many=True),
+            400: OpenApiResponse(description='Expertise tag parameter is required')
+        }
+    )
     @action(detail=False, methods=['get'])
     def by_expertise(self, request):
         expertise = request.query_params.get('tag', None)
@@ -52,6 +144,43 @@ class MentorProfileViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Expertise tag parameter is required"}, 
                         status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(
+        operation_id='get_mentor_availability',
+        tags=['Mentors'],
+        summary='Get mentor availability',
+        description='Check if a mentor is available for new mentorships',
+        responses={
+            200: OpenApiResponse(
+                response=inline_serializer(
+                    name='MentorAvailability',
+                    fields={
+                        'is_available': OpenApiTypes.BOOL,
+                        'active_mentorships': OpenApiTypes.INT,
+                        'max_mentorships': OpenApiTypes.INT
+                    }
+                ),
+                description='Mentor availability status',
+                examples=[
+                    OpenApiExample(
+                        'Available Mentor',
+                        value={
+                            "is_available": True,
+                            "active_mentorships": 2,
+                            "max_mentorships": 5
+                        }
+                    ),
+                    OpenApiExample(
+                        'Unavailable Mentor',
+                        value={
+                            "is_available": False,
+                            "active_mentorships": 5,
+                            "max_mentorships": 5
+                        }
+                    )
+                ]
+            )
+        }
+    )
     @action(detail=True, methods=['get'])
     def availability(self, request, pk=None):
         profile = self.get_object()
@@ -71,6 +200,60 @@ class MentorProfileViewSet(viewsets.ModelViewSet):
             "max_mentorships": 5
         })
 
+@extend_schema(
+    operation_id='browse_mentors',
+    tags=['Mentors', 'Browse'],
+    summary='Browse available mentors',
+    description='''
+    Browse and search through available mentors. This endpoint is designed for students
+    to discover and find mentors that match their learning goals.
+    
+    **Features:**
+    - Search by mentor name, username, or expertise
+    - Filter mentors by specific technologies or domains
+    - Discover mentors with proven experience
+    ''',
+    parameters=[
+        OpenApiParameter(
+            name='search',
+            description='Search mentors by name, username, or expertise tags',
+            required=False,
+            type=str,
+            location=OpenApiParameter.QUERY,
+            examples=[
+                OpenApiExample('Technology Search', value='Python'),
+                OpenApiExample('Name Search', value='John'),
+                OpenApiExample('Domain Search', value='Web Development')
+            ]
+        )
+    ],
+    responses={
+        200: OpenApiResponse(
+            response=MentorListSerializer(many=True),
+            description='List of available mentors',
+            examples=[
+                OpenApiExample(
+                    'Available Mentors',
+                    value=[
+                        {
+                            "id": 1,
+                            "username": "senior_dev",
+                            "mentor_profile": {
+                                "id": 1,
+                                "name": "John Smith",
+                                "bio": "Senior developer with 8+ years experience",
+                                "expertise_tags": ["Python", "Django", "React"],
+                                "years_of_experience": 8,
+                                "company": "Tech Corp",
+                                "is_available": True
+                            }
+                        }
+                    ]
+                )
+            ]
+        )
+    }
+)
 class MentorListView(generics.ListAPIView):
     """View for students to browse available mentors"""
     queryset = User.objects.filter(mentors_profile__isnull=False)
@@ -79,6 +262,44 @@ class MentorListView(generics.ListAPIView):
     filter_backends = [filters.SearchFilter]
     search_fields = ['username', 'mentors_profile__name', 'mentors_profile__expertise_tags']
 
+@extend_schema_view(
+    list=extend_schema(
+        operation_id='list_mentorship_requests',
+        tags=['Mentorship'],
+        summary='List mentorship requests',
+        description='Get mentorship requests based on user role (student sees their requests, mentor sees requests to them)'
+    ),
+    create=extend_schema(
+        operation_id='create_mentorship_request',
+        tags=['Mentorship'],
+        summary='Create mentorship request',
+        description='Create a new mentorship request (students can request mentorship from mentors)'
+    ),
+    retrieve=extend_schema(
+        operation_id='get_mentorship_request',
+        tags=['Mentorship'],
+        summary='Get mentorship request',
+        description='Retrieve a specific mentorship request by ID'
+    ),
+    update=extend_schema(
+        operation_id='update_mentorship_request',
+        tags=['Mentorship'],
+        summary='Update mentorship request',
+        description='Update a mentorship request (full update)'
+    ),
+    partial_update=extend_schema(
+        operation_id='partial_update_mentorship_request',
+        tags=['Mentorship'],
+        summary='Partially update mentorship request',
+        description='Partially update a mentorship request'
+    ),
+    destroy=extend_schema(
+        operation_id='delete_mentorship_request',
+        tags=['Mentorship'],
+        summary='Delete mentorship request',
+        description='Delete a mentorship request'
+    )
+)
 class MentorshipRequestViewSet(viewsets.ModelViewSet):
     """ViewSet for managing mentorship requests"""
     serializer_class = MentorshipRequestSerializer
@@ -113,6 +334,17 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         
         return context
     
+    @extend_schema(
+        operation_id='accept_mentorship_request',
+        tags=['Mentorship'],
+        summary='Accept mentorship request',
+        description='Accept a mentorship request (mentors only)',
+        responses={
+            200: MentorshipRequestSerializer,
+            403: OpenApiResponse(description='Permission denied - not the target mentor'),
+            404: OpenApiResponse(description='Request not found')
+        }
+    )
     @action(detail=True, methods=['patch'], permission_classes=[permissions.IsAuthenticated, IsMentor])
     def accept(self, request, pk=None):
         """Custom action for mentors to accept a request"""
@@ -132,6 +364,23 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request_obj)
         return Response(serializer.data)
     
+    @extend_schema(
+        operation_id='decline_mentorship_request',
+        tags=['Mentorship'],
+        summary='Decline mentorship request',
+        description='Decline a mentorship request with optional reason (mentors only)',
+        request=inline_serializer(
+            name='DeclineRequest',
+            fields={
+                'rejection_reason': OpenApiTypes.STR
+            }
+        ),
+        responses={
+            200: MentorshipRequestSerializer,
+            403: OpenApiResponse(description='Permission denied - not the target mentor'),
+            404: OpenApiResponse(description='Request not found')
+        }
+    )
     @action(detail=True, methods=['patch'], permission_classes=[permissions.IsAuthenticated, IsMentor])
     def decline(self, request, pk=None):
         """Custom action for mentors to decline a request with a reason"""
@@ -155,6 +404,15 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request_obj)
         return Response(serializer.data)
     
+    @extend_schema(
+        operation_id='get_student_mentorship_requests',
+        tags=['Mentorship', 'Students'],
+        summary='Get student mentorship requests',
+        description='Get all mentorship requests made by the authenticated student',
+        responses={
+            200: MentorshipRequestSerializer(many=True)
+        }
+    )
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated, IsStudent])
     def student(self, request):
         """Endpoint for students to view their requests"""
@@ -162,6 +420,15 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(requests, many=True)
         return Response(serializer.data)
     
+    @extend_schema(
+        operation_id='get_mentor_mentorship_requests',
+        tags=['Mentorship', 'Mentors'],
+        summary='Get mentor mentorship requests',
+        description='Get all mentorship requests received by the authenticated mentor',
+        responses={
+            200: MentorshipRequestSerializer(many=True)
+        }
+    )
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated, IsMentor])
     def mentor(self, request):
         """Endpoint for mentors to view requests sent to them"""
