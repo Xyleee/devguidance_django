@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from .models import MentorshipRequest
+from mentors.models import MentorshipRequest
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
@@ -22,16 +22,12 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         return False
 
 class IsStudent(permissions.BasePermission):
-    """
-    Permission to only allow students to access.
-    """
+    """Permission to check if user is a student"""
     def has_permission(self, request, view):
         return hasattr(request.user, 'students_profile')
 
 class IsMentor(permissions.BasePermission):
-    """
-    Permission to only allow mentors to access.
-    """
+    """Permission to check if user is a mentor"""
     def has_permission(self, request, view):
         return hasattr(request.user, 'mentors_profile')
 
@@ -63,17 +59,12 @@ class CanManageRequest(permissions.BasePermission):
             if hasattr(request.user, 'mentors_profile'):
                 return obj.mentor == request.user
         
-        return False 
+        return False
 
 class IsMessageAllowed(permissions.BasePermission):
-    """
-    Custom permission to only allow messaging between matched mentors and students.
-    """
-    message = "You are not allowed to message this user."
-    
+    """Permission to check if users can message each other"""
     def has_permission(self, request, view):
-        # Basic authentication check
-        return request.user and request.user.is_authenticated
+        return request.user.is_authenticated
     
     def has_object_permission(self, request, view, obj):
         # For GET requests checking message history

@@ -15,7 +15,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from .models import StudentProfile, StudentProject, MentorProfile, MentorshipRequest, Message
+from students.models import StudentProfile, StudentProject
+from mentors.models import MentorProfile, MentorshipRequest
+from .models import Message
 from .permissions import IsOwnerOrReadOnly, IsStudent, IsMentor, CanManageRequest, IsMessageAllowed
 from rest_framework.permissions import AllowAny
 from django.db import models
@@ -198,7 +200,7 @@ class RegisterView(generics.CreateAPIView):
                 'username': user.username,
                 'email': user.email,
                 'user_type': user_type,
-                f'{profile_type}': profile_serializer.data
+                profile_type: profile_serializer.data
             }
         }, status=status.HTTP_201_CREATED)
 
@@ -518,11 +520,11 @@ class MentorProfileViewSet(viewsets.ModelViewSet):
 
 class MentorListView(generics.ListAPIView):
     """View for students to browse available mentors"""
-    queryset = User.objects.filter(mentor_profile__isnull=False)
+    queryset = User.objects.filter(mentors_profile__isnull=False)
     serializer_class = MentorListSerializer
     permission_classes = [IsAuthenticated, IsStudent]
     filter_backends = [filters.SearchFilter]
-    search_fields = ['username', 'mentor_profile__name', 'mentor_profile__expertise_tags']
+    search_fields = ['username', 'mentors_profile__name', 'mentors_profile__expertise_tags']
 
 class MentorshipRequestViewSet(viewsets.ModelViewSet):
     """ViewSet for managing mentorship requests"""
@@ -535,10 +537,10 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         # If the action is 'list', filter based on user role
         if self.action == 'list':
             # Return based on which endpoint was accessed
-            if hasattr(user, 'student_profile'):
+            if hasattr(user, 'students_profile'):
                 # Student viewing their own requests
                 return MentorshipRequest.objects.filter(student=user)
-            elif hasattr(user, 'mentor_profile'):
+            elif hasattr(user, 'mentors_profile'):
                 # Mentor viewing requests they've received
                 return MentorshipRequest.objects.filter(mentor=user)
             return MentorshipRequest.objects.none()
@@ -553,7 +555,7 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         # Include student details if user is a mentor viewing requests
-        if hasattr(user, 'mentor_profile'):
+        if hasattr(user, 'mentors_profile'):
             context['include_student_details'] = True
         
         return context
@@ -781,7 +783,7 @@ class MessageAPIView(APIView):
         sender = request.user
         
         # Case 1: Sender is a student, receiver is a mentor
-        if hasattr(sender, 'student_profile') and hasattr(receiver, 'mentor_profile'):
+        if hasattr(sender, 'students_profile') and hasattr(receiver, 'mentors_profile'):
             # Check if there's an accepted mentorship request
             is_valid = MentorshipRequest.objects.filter(
                 student=sender,
@@ -796,7 +798,7 @@ class MessageAPIView(APIView):
                 )
         
         # Case 2: Sender is a mentor, receiver is a student
-        elif hasattr(sender, 'mentor_profile') and hasattr(receiver, 'student_profile'):
+        elif hasattr(sender, 'mentors_profile') and hasattr(receiver, 'students_profile'):
             # Check if there's an accepted mentorship request
             is_valid = MentorshipRequest.objects.filter(
                 student=receiver,
