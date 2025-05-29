@@ -15,7 +15,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
-from .models import StudentProfile, StudentProject, MentorProfile, MentorshipRequest, Message
+from .models import Message
+from students.models import StudentProfile, StudentProject
+from mentors.models import MentorProfile, MentorshipRequest
 from .permissions import IsOwnerOrReadOnly, IsStudent, IsMentor, CanManageRequest, IsMessageAllowed
 from rest_framework.permissions import AllowAny
 from django.db import models
@@ -92,7 +94,7 @@ def home(request):
                                 "bio": "",
                                 "year_level": 1,
                                 "tech_stack": [],
-                                "photo_url": None
+                                "profile_picture_url": None
                             }
                         }
                     }
