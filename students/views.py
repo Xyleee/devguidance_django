@@ -45,25 +45,61 @@ from drf_spectacular.types import OpenApiTypes
         operation_id='get_student_profile',
         tags=['Students'],
         summary='Get student profile',
-        description='Retrieve a specific student profile by ID'
+        description='Retrieve a specific student profile by ID',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student profile to retrieve',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     update=extend_schema(
         operation_id='update_student_profile',
         tags=['Students'],
         summary='Update student profile',
-        description='Update a student profile (full update)'
+        description='Update a student profile (full update)',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student profile to update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     partial_update=extend_schema(
         operation_id='partial_update_student_profile',
         tags=['Students'],
         summary='Partially update student profile',
-        description='Partially update a student profile'
+        description='Partially update a student profile',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student profile to partially update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     destroy=extend_schema(
         operation_id='delete_student_profile',
         tags=['Students'],
         summary='Delete student profile',
-        description='Delete a student profile'
+        description='Delete a student profile',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student profile to delete',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     )
 )
 class StudentProfileViewSet(viewsets.ModelViewSet):
@@ -230,25 +266,61 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         operation_id='get_student_project',
         tags=['Students', 'Projects'],
         summary='Get student project',
-        description='Retrieve a specific student project by ID'
+        description='Retrieve a specific student project by ID',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student project to retrieve',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     update=extend_schema(
         operation_id='update_student_project',
         tags=['Students', 'Projects'],
         summary='Update student project',
-        description='Update a student project (full update)'
+        description='Update a student project (full update)',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student project to update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     partial_update=extend_schema(
         operation_id='partial_update_student_project',
         tags=['Students', 'Projects'],
         summary='Partially update student project',
-        description='Partially update a student project'
+        description='Partially update a student project',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student project to partially update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     destroy=extend_schema(
         operation_id='delete_student_project',
         tags=['Students', 'Projects'],
         summary='Delete student project',
-        description='Delete a student project'
+        description='Delete a student project',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the student project to delete',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     )
 )
 class StudentProjectViewSet(viewsets.ModelViewSet):

@@ -200,7 +200,7 @@ class RegisterView(generics.CreateAPIView):
         }, status=status.HTTP_201_CREATED)
 
 @extend_schema(
-    operation_id='protected_example',
+    operation_id='protected_endpoint',
     tags=['Users'],
     summary='Protected endpoint example',
     description='Example of a protected endpoint that requires authentication',
@@ -224,7 +224,7 @@ class ProtectedView(APIView):
 
 @extend_schema_view(
     post=extend_schema(
-        operation_id='send_new_message',
+        operation_id='send_new_message_to_user',
         tags=['Messages'],
         summary='Send a message',
         description='''
@@ -312,7 +312,7 @@ class ProtectedView(APIView):
         ]
     ),
     get=extend_schema(
-        operation_id='get_conversation_history',
+        operation_id='get_conversation_history_with_user',
         tags=['Messages'],
         summary='Get conversation history',
         description='''
@@ -474,7 +474,7 @@ class MessageAPIView(APIView):
         return mentorship_exists
 
 @extend_schema(
-    operation_id='stream_messages',
+    operation_id='stream_messages_with_user',
     tags=['Messages'],
     summary='Stream real-time messages',
     description='''
@@ -590,7 +590,7 @@ def test_endpoint(request):
 
 @extend_schema_view(
     get=extend_schema(
-        operation_id='test_api_get',
+        operation_id='test_api_get_endpoint',
         tags=['Testing'],
         summary='Test API endpoint (GET)',
         description='Simple test endpoint to verify API connectivity',
@@ -609,7 +609,7 @@ def test_endpoint(request):
         }
     ),
     post=extend_schema(
-        operation_id='test_api_post',
+        operation_id='test_api_post_endpoint',
         tags=['Testing'],
         summary='Test API endpoint (POST)',
         description='Simple test endpoint to verify POST request handling',

@@ -478,7 +478,7 @@ SPECTACULAR_SETTINGS = {
         {
             'name': 'Students',
             'description': '''
-            👨‍🎓 **Student Profiles & Projects**
+            👨‍🎓 **Student Profile & Projects**
             
             **All student-related functionality in one place:**
             - Profile management and customization
@@ -560,11 +560,8 @@ SPECTACULAR_SETTINGS = {
         'drf_spectacular.hooks.postprocess_schema_enums'
     ],
     
-    # Enum handling
-    'ENUM_NAME_OVERRIDES': {
-        'ValidationErrorEnum': 'drf_spectacular.plumbing.ValidationErrorEnum.choices',
-        'PasswordValidationErrorEnum': 'drf_spectacular.plumbing.PasswordValidationErrorEnum.choices',
-    },
+    # Enum handling - corrected paths or removed if not needed
+    'ENUM_NAME_OVERRIDES': {},
     
     # Component naming
     'COMPONENT_SPLIT_PATCH': True,

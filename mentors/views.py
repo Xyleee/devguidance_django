@@ -50,25 +50,61 @@ from drf_spectacular.types import OpenApiTypes
         operation_id='get_mentor_profile',
         tags=['Mentors'],
         summary='Get mentor profile',
-        description='Retrieve a specific mentor profile by ID'
+        description='Retrieve a specific mentor profile by ID',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentor profile to retrieve',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     update=extend_schema(
         operation_id='update_mentor_profile',
         tags=['Mentors'],
         summary='Update mentor profile',
-        description='Update a mentor profile (full update)'
+        description='Update a mentor profile (full update)',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentor profile to update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     partial_update=extend_schema(
         operation_id='partial_update_mentor_profile',
         tags=['Mentors'],
         summary='Partially update mentor profile',
-        description='Partially update a mentor profile'
+        description='Partially update a mentor profile',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentor profile to partially update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     destroy=extend_schema(
         operation_id='delete_mentor_profile',
         tags=['Mentors'],
         summary='Delete mentor profile',
-        description='Delete a mentor profile'
+        description='Delete a mentor profile',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentor profile to delete',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     )
 )
 class MentorProfileViewSet(viewsets.ModelViewSet):
@@ -279,25 +315,61 @@ class MentorListView(generics.ListAPIView):
         operation_id='get_mentorship_request',
         tags=['Mentorship'],
         summary='Get mentorship request',
-        description='Retrieve a specific mentorship request by ID'
+        description='Retrieve a specific mentorship request by ID',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentorship request to retrieve',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     update=extend_schema(
         operation_id='update_mentorship_request',
         tags=['Mentorship'],
         summary='Update mentorship request',
-        description='Update a mentorship request (full update)'
+        description='Update a mentorship request (full update)',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentorship request to update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     partial_update=extend_schema(
         operation_id='partial_update_mentorship_request',
         tags=['Mentorship'],
         summary='Partially update mentorship request',
-        description='Partially update a mentorship request'
+        description='Partially update a mentorship request',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentorship request to partially update',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     ),
     destroy=extend_schema(
         operation_id='delete_mentorship_request',
         tags=['Mentorship'],
         summary='Delete mentorship request',
-        description='Delete a mentorship request'
+        description='Delete a mentorship request',
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                description='ID of the mentorship request to delete',
+                required=True,
+                type=int,
+                location=OpenApiParameter.PATH
+            )
+        ]
     )
 )
 class MentorshipRequestViewSet(viewsets.ModelViewSet):
