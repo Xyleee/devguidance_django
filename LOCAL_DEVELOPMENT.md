@@ -32,9 +32,17 @@ RENDER=False
 
 ### 2. Install Dependencies
 
+**For Windows (Local Development):**
+```bash
+pip install -r requirements-dev.txt
+```
+
+**For Linux/Mac (or if you prefer):**
 ```bash
 pip install -r requirements.txt
 ```
+
+> **Note**: Windows users should use `requirements-dev.txt` as it includes `python-magic-bin` which works better on Windows. The production `requirements.txt` uses `python-magic` which is optimized for Linux (Render).
 
 ### 3. Run Local Development Server
 
@@ -52,6 +60,11 @@ The settings are configured to work in this priority order:
 
 1. **Environment Variables** (`.env` file for local, Render dashboard for production)
 2. **Default Values** (fallback for local development)
+
+### Dependencies Strategy
+
+- **Local (Windows)**: `requirements-dev.txt` with `python-magic-bin`
+- **Production (Linux)**: `requirements.txt` with `python-magic` + system `libmagic1`
 
 ### Local Development Features
 
@@ -144,26 +157,47 @@ curl -X POST http://127.0.0.1:8000/api/token/ \
 
 ### For Local Development
 1. Use `.env` file with `DEBUG=True`
-2. Run `python manage.py runserver`
-3. Access `http://127.0.0.1:8000/`
+2. Install with `pip install -r requirements-dev.txt` (Windows)
+3. Run `python manage.py runserver`
+4. Access `http://127.0.0.1:8000/`
 
 ### For Production Testing
 1. Environment variables set in Render dashboard
-2. `DEBUG=False` in production
-3. Access your Render URL
+2. Uses `requirements.txt` with Linux-compatible packages
+3. `DEBUG=False` in production
+4. Access your Render URL
 
 ## Troubleshooting Local Development
 
 ### Common Issues
 
-**1. Database Connection Error**
+**1. python-magic Installation Issues**
+
+**On Windows:**
+```bash
+# Use the development requirements
+pip install -r requirements-dev.txt
+```
+
+**On Linux/Mac:**
+```bash
+# Install system dependency first
+sudo apt-get install libmagic1  # Ubuntu/Debian
+# or
+brew install libmagic           # macOS
+
+# Then install Python packages
+pip install -r requirements.txt
+```
+
+**2. Database Connection Error**
 ```
 # Ensure PostgreSQL is running locally
 # Check database credentials in .env file
 # Create database if it doesn't exist
 ```
 
-**2. Static Files Not Loading**
+**3. Static Files Not Loading**
 ```bash
 # Collect static files
 python manage.py collectstatic
@@ -172,15 +206,17 @@ python manage.py collectstatic
 python manage.py runserver
 ```
 
-**3. Module Import Errors**
+**4. Module Import Errors**
 ```bash
 # Reinstall dependencies
-pip install -r requirements.txt
+pip install -r requirements-dev.txt  # Windows
+# or
+pip install -r requirements.txt      # Linux/Mac
 
 # Check virtual environment is activated
 ```
 
-**4. Migration Issues**
+**5. Migration Issues**
 ```bash
 # Apply migrations
 python manage.py migrate
@@ -205,10 +241,11 @@ devguidance_django/
 ├── .env                    # Local environment variables (not in git)
 ├── local.env              # Template for local environment
 ├── env.example            # Template for production environment
+├── requirements.txt       # Production requirements (Linux-compatible)
+├── requirements-dev.txt   # Development requirements (Windows-compatible)
 ├── DEPLOYMENT.md          # Production deployment guide
 ├── LOCAL_DEVELOPMENT.md   # This file
 ├── manage.py
-├── requirements.txt
 ├── build.sh              # Render build script
 ├── runtime.txt           # Python version for Render
 └── devguidance_django/
@@ -222,9 +259,27 @@ devguidance_django/
 - ✅ DEBUG is False in production
 - ✅ Local development uses safe defaults
 
+## Platform-Specific Notes
+
+### Windows Development
+- Use `requirements-dev.txt` for better Windows compatibility
+- Includes `python-magic-bin` which works out-of-the-box on Windows
+- No system dependencies needed
+
+### Linux/Mac Development  
+- Use `requirements.txt` or `requirements-dev.txt`
+- May need to install `libmagic` system package
+- More similar to production environment
+
+### Production (Render - Linux)
+- Uses `requirements.txt` with `python-magic`
+- `libmagic1` installed via `build.sh`
+- Optimized for Linux deployment
+
 ## Next Steps
 
 1. Create your `.env` file from `local.env`
-2. Start local development with `python manage.py runserver`
-3. Deploy to production following `DEPLOYMENT.md`
-4. Both environments will work independently! 
+2. Install dependencies with `requirements-dev.txt` (Windows) or `requirements.txt` (Linux/Mac)
+3. Start local development with `python manage.py runserver`
+4. Deploy to production following `DEPLOYMENT.md`
+5. Both environments will work independently! 

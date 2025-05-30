@@ -1,15 +1,19 @@
+# Development requirements for Windows local development
+# Use: pip install -r requirements-dev.txt
+
 asgiref==3.8.1
 Django==5.1.6
 psycopg2-binary==2.9.10
 sqlparse==0.5.3
 tzdata==2025.1
 Pillow==10.0.0
-python-magic==0.4.27
+python-magic-bin==0.4.14
 djangorestframework==3.14.0
 djangorestframework-simplejwt==5.2.2
 drf-yasg==1.21.7
 packaging
-gunicorn==21.2.0
-whitenoise==6.7.0
-dj-database-url==2.1.0
 python-dotenv==1.0.0
+
+# Development only packages
+django-extensions==3.2.3
+ipython==8.18.1 
