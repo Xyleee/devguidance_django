@@ -183,9 +183,15 @@ SWAGGER_SETTINGS = {
         'Bearer': {
             'type': 'apiKey',
             'name': 'Authorization',
-            'in': 'header'
+            'in': 'header',
+            'description': 'JWT authorization header using the Bearer scheme. Example: "Authorization: Bearer {token}"'
         }
     },
+    'DEFAULT_SECURITY': [
+        {
+            'Bearer': []
+        }
+    ],
     'USE_SESSION_AUTH': False,
     'JSON_EDITOR': True,
     'SUPPORTED_SUBMIT_METHODS': [
@@ -200,7 +206,8 @@ SWAGGER_SETTINGS = {
     'DOC_EXPANSION': 'none',
     'DEEP_LINKING': True,
     'SHOW_EXTENSIONS': True,
-    'DEFAULT_MODEL_RENDERING': 'example'
+    'DEFAULT_MODEL_RENDERING': 'example',
+    'PERSIST_AUTH': True,
 }
 
 REDOC_SETTINGS = {
