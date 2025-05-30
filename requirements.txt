@@ -9,3 +9,7 @@ djangorestframework==3.14.0
 djangorestframework-simplejwt==5.2.2
 drf-yasg==1.21.7
 packaging
+gunicorn==21.2.0
+whitenoise==6.7.0
+dj-database-url==2.1.0
+python-dotenv==1.0.0

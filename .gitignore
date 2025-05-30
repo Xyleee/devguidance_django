@@ -5,3 +5,11 @@ db.sqlite3
 media/
 staticfiles/
 venv/
+*.log
+.DS_Store
+.vscode/
+.idea/
+node_modules/
+*.egg-info/
+dist/
+build/
