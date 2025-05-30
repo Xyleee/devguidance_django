@@ -5,7 +5,14 @@ from .models import StudentProfile, StudentProject, MentorProfile, MentorshipReq
 from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import ValidationError
 import os
-import magic
+
+# Try to import magic, fallback to basic validation if not available
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+    print("Warning: python-magic not available. File type validation disabled.")
 
 class PhotoValidationMixin:
     """Mixin for validating photo uploads"""
@@ -18,18 +25,40 @@ class PhotoValidationMixin:
         if photo.size > 2 * 1024 * 1024:  # 2MB in bytes
             raise serializers.ValidationError("Image file too large. Maximum size is 2MB.")
             
-        # Validate file type
-        mime = magic.Magic(mime=True)
-        file_type = mime.from_buffer(photo.read())
-        photo.seek(0)  # Reset file pointer after reading
-        
-        valid_types = ['image/jpeg', 'image/png', 'image/webp']
-        if file_type not in valid_types:
-            raise serializers.ValidationError(
-                "Invalid image format. Only JPEG, PNG, and WebP are supported."
-            )
+        # Validate file type using magic if available
+        if MAGIC_AVAILABLE:
+            try:
+                mime = magic.Magic(mime=True)
+                file_type = mime.from_buffer(photo.read())
+                photo.seek(0)  # Reset file pointer after reading
+                
+                valid_types = ['image/jpeg', 'image/png', 'image/webp']
+                if file_type not in valid_types:
+                    raise serializers.ValidationError(
+                        "Invalid image format. Only JPEG, PNG, and WebP are supported."
+                    )
+            except Exception as e:
+                # If magic fails, fall back to simple extension check
+                print(f"Magic validation failed: {e}, using extension check")
+                self._validate_photo_by_extension(photo)
+        else:
+            # Fallback: validate by file extension
+            self._validate_photo_by_extension(photo)
             
         return photo
+    
+    def _validate_photo_by_extension(self, photo):
+        """Fallback validation using file extension"""
+        if hasattr(photo, 'name') and photo.name:
+            valid_extensions = ['.jpg', '.jpeg', '.png', '.webp']
+            file_extension = os.path.splitext(photo.name)[1].lower()
+            if file_extension not in valid_extensions:
+                raise serializers.ValidationError(
+                    "Invalid image format. Only JPEG, PNG, and WebP files are supported."
+                )
+        else:
+            # If no filename available, assume it's valid (basic fallback)
+            pass
 
 class RegisterSerializer(serializers.ModelSerializer, PhotoValidationMixin):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])

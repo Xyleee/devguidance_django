@@ -28,6 +28,8 @@ import os
 from django.utils import timezone
 from .rate_limiting import rate_limit
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 # Create your views here.
 
@@ -35,10 +37,55 @@ def home(request):
     return render(request, 'users/home.html')
 
 class RegisterView(generics.CreateAPIView):
+    """
+    Register a new user account
+    
+    Creates a new user account with either student or mentor profile based on user_type parameter.
+    """
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = RegisterSerializer
     
+    @swagger_auto_schema(
+        operation_description="Register a new user account as either a student or mentor",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['username', 'email', 'password', 'password2', 'user_type'],
+            properties={
+                'username': openapi.Schema(type=openapi.TYPE_STRING, description='Username'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email address'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password'),
+                'password2': openapi.Schema(type=openapi.TYPE_STRING, description='Password confirmation'),
+                'user_type': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description='Type of user account',
+                    enum=['student', 'mentor']
+                ),
+            },
+        ),
+        responses={
+            201: openapi.Response(
+                description="User registered successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'user': openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'username': openapi.Schema(type=openapi.TYPE_STRING),
+                                'email': openapi.Schema(type=openapi.TYPE_STRING),
+                            }
+                        ),
+                        'profile': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: openapi.Response(description="Bad request - validation errors")
+        },
+        tags=['Authentication']
+    )
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -57,23 +104,47 @@ class RegisterView(generics.CreateAPIView):
             profile_serializer = MentorProfileSerializer(profile)
             
         return Response({
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email
-            },
-            "profile": profile_serializer.data,
-            "message": f"User registered successfully as a {user_type}."
+            
         }, status=status.HTTP_201_CREATED)
 
 class ProtectedView(APIView):
+    """
+    Protected endpoint that requires authentication
+    
+    Returns a personalized message for authenticated users.
+    """
     permission_classes = [IsAuthenticated] # Require authentication
 
+    @swagger_auto_schema(
+        operation_description="Access protected content - requires authentication",
+        responses={
+            200: openapi.Response(
+                description="Success",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message': openapi.Schema(
+                            type=openapi.TYPE_STRING,
+                            description='Personalized greeting message'
+                        )
+                    }
+                )
+            ),
+            401: openapi.Response(description="Unauthorized - authentication required")
+        },
+        tags=['Authentication']
+    )
     def get(self, request):
         content = {'message': f'Hello, {request.user.username}! This is protected content.'}
         return Response(content)
 
 class StudentProfileViewSet(viewsets.ModelViewSet):
+    """
+    Student Profile Management
+    
+    Provides CRUD operations for student profiles. Users can only manage their own profiles.
+    Supports searching by name and tech stack.
+    """
     serializer_class = StudentProfileSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     filter_backends = [filters.SearchFilter]
@@ -153,7 +224,12 @@ class MentorListView(generics.ListAPIView):
     search_fields = ['username', 'mentor_profile__name', 'mentor_profile__expertise_tags']
 
 class MentorshipRequestViewSet(viewsets.ModelViewSet):
-    """ViewSet for managing mentorship requests"""
+    """
+    Mentorship Request Management
+    
+    Allows students to create mentorship requests and mentors to accept/decline them.
+    Students can view their own requests, mentors can view requests sent to them.
+    """
     serializer_class = MentorshipRequestSerializer
     permission_classes = [IsAuthenticated, CanManageRequest]
     
@@ -186,6 +262,16 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         
         return context
     
+    @swagger_auto_schema(
+        operation_description="Accept a mentorship request",
+        request_body=openapi.Schema(type=openapi.TYPE_OBJECT, properties={}),
+        responses={
+            200: MentorshipRequestSerializer,
+            403: openapi.Response(description="Forbidden - not your request or not a mentor"),
+            404: openapi.Response(description="Request not found")
+        },
+        tags=['Mentorship Requests']
+    )
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsMentor])
     def accept(self, request, pk=None):
         """Custom action for mentors to accept a request"""
@@ -205,6 +291,24 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request_obj)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        operation_description="Decline a mentorship request with optional reason",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'rejection_reason': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description='Optional reason for declining the request'
+                )
+            }
+        ),
+        responses={
+            200: MentorshipRequestSerializer,
+            403: openapi.Response(description="Forbidden - not your request or not a mentor"),
+            404: openapi.Response(description="Request not found")
+        },
+        tags=['Mentorship Requests']
+    )
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsMentor])
     def decline(self, request, pk=None):
         """Custom action for mentors to decline a request with a reason"""
@@ -243,8 +347,37 @@ class MentorshipRequestViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class MessageAPIView(APIView):
+    """
+    Messaging between mentors and students
+    
+    Allows sending and retrieving messages between matched mentors and students only.
+    """
     permission_classes = [IsAuthenticated, IsMessageAllowed]
     
+    @swagger_auto_schema(
+        operation_description="Send a message to another user in your mentorship network",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['receiver', 'content'],
+            properties={
+                'receiver': openapi.Schema(
+                    type=openapi.TYPE_INTEGER, 
+                    description='ID of the message recipient'
+                ),
+                'content': openapi.Schema(
+                    type=openapi.TYPE_STRING, 
+                    description='Message content'
+                )
+            }
+        ),
+        responses={
+            201: MessageSerializer,
+            400: openapi.Response(description="Bad request - missing receiver or invalid data"),
+            403: openapi.Response(description="Forbidden - not allowed to message this user"),
+            404: openapi.Response(description="Receiver not found")
+        },
+        tags=['Messaging']
+    )
     def post(self, request):
         """Send a message to another user"""
         # Get the receiver ID from the request data
@@ -316,6 +449,31 @@ class MessageAPIView(APIView):
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @swagger_auto_schema(
+        operation_description="Get message history with another user",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_PATH,
+                description="ID of the other user to get message history with",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            )
+        ],
+        responses={
+            200: openapi.Response(
+                description="Message history",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                )
+            ),
+            400: openapi.Response(description="Bad request - user ID required"),
+            403: openapi.Response(description="Forbidden - not allowed to view messages with this user"),
+            404: openapi.Response(description="User not found")
+        },
+        tags=['Messaging']
+    )
     def get(self, request, user_id=None):
         """Get message history between current user and specified user"""
         if not user_id:
