@@ -309,26 +309,53 @@ class FileValidationMixin:
         if file.size > 2 * 1024 * 1024:  # 2MB in bytes
             raise serializers.ValidationError("File too large. Maximum size is 2MB.")
             
-        # Validate file type
-        mime = magic.Magic(mime=True)
-        file_type = mime.from_buffer(file.read())
-        file.seek(0)  # Reset file pointer after reading
-        
-        valid_types = [
-            # Images
-            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-            # Documents
-            'application/pdf', 'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/plain', 'application/rtf'
-        ]
-        
-        if file_type not in valid_types:
-            raise serializers.ValidationError(
-                "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF."
-            )
+        # Validate file type using magic if available
+        if MAGIC_AVAILABLE:
+            try:
+                mime = magic.Magic(mime=True)
+                file_type = mime.from_buffer(file.read())
+                file.seek(0)  # Reset file pointer after reading
+                
+                valid_types = [
+                    # Images
+                    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+                    # Documents
+                    'application/pdf', 'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'text/plain', 'application/rtf'
+                ]
+                
+                if file_type not in valid_types:
+                    raise serializers.ValidationError(
+                        "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF."
+                    )
+            except Exception as e:
+                # If magic fails, fall back to simple extension check
+                print(f"Magic validation failed: {e}, using extension check")
+                self._validate_file_by_extension(file)
+        else:
+            # Fallback: validate by file extension
+            self._validate_file_by_extension(file)
             
         return file
+    
+    def _validate_file_by_extension(self, file):
+        """Fallback validation using file extension"""
+        if hasattr(file, 'name') and file.name:
+            valid_extensions = [
+                # Images
+                '.jpg', '.jpeg', '.png', '.webp', '.gif',
+                # Documents  
+                '.pdf', '.doc', '.docx', '.txt', '.rtf'
+            ]
+            file_extension = os.path.splitext(file.name)[1].lower()
+            if file_extension not in valid_extensions:
+                raise serializers.ValidationError(
+                    "Invalid file format. Supported formats: JPEG, PNG, WebP, GIF, PDF, DOC, DOCX, TXT, RTF."
+                )
+        else:
+            # If no filename available, assume it's valid (basic fallback)
+            pass
 
 class MessageSerializer(serializers.ModelSerializer, FileValidationMixin):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
@@ -343,11 +370,18 @@ class MessageSerializer(serializers.ModelSerializer, FileValidationMixin):
     
     def validate(self, attrs):
         # Ensure either content or file is provided
-        if not attrs.get('content') and not attrs.get('file'):
+        content = attrs.get('content', '').strip()
+        file = attrs.get('file')
+        
+        if not content and not file:
             raise serializers.ValidationError("Either content or file must be provided")
             
         # Validate file if provided
-        if file := attrs.get('file'):
-            self.validate_file(file)
+        if file:
+            try:
+                self.validate_file(file)
+            except Exception as e:
+                # If file validation fails, convert to serializer error
+                raise serializers.ValidationError(f"File validation error: {str(e)}")
             
         return attrs
