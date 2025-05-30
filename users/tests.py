@@ -11,7 +11,9 @@ from PIL import Image
 import json
 import tempfile
 
-from .models import StudentProfile, StudentProject, MentorProfile, MentorshipRequest, Message
+from students.models import StudentProfile, StudentProject
+from mentors.models import MentorProfile, MentorshipRequest
+from .models import Message
 from .serializers import (
     RegisterSerializer, 
     StudentProfileSerializer, 
@@ -401,6 +403,134 @@ class AuthenticationAPITests(APITestCase):
         }
         response = self.client.post(self.token_url, data)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_token_obtain_clean_response(self):
+        """Test that token obtain endpoint returns clean response format"""
+        # Create a test user
+        user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpassword123'
+        )
+        
+        # Create student profile
+        StudentProfile.objects.create(
+            user=user,
+            name='Test User',
+            bio='Test bio',
+            year_level=2,
+            tech_stack=['Python', 'Django']
+        )
+        
+        data = {
+            'username': 'testuser',
+            'password': 'testpassword123'
+        }
+        
+        response = self.client.post(self.token_url, data)
+        
+        # Check status code
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Check response structure
+        self.assertIn('message', response.data)
+        self.assertIn('user', response.data)
+        self.assertIn('tokens', response.data)
+        
+        # Check message content
+        self.assertEqual(response.data['message'], 'Login successful')
+        
+        # Check user data structure
+        user_data = response.data['user']
+        self.assertEqual(user_data['id'], user.id)
+        self.assertEqual(user_data['username'], 'testuser')
+        self.assertEqual(user_data['email'], 'test@example.com')
+        self.assertEqual(user_data['user_type'], 'student')
+        
+        # Check profile data
+        self.assertIn('profile', user_data)
+        profile_data = user_data['profile']
+        self.assertEqual(profile_data['name'], 'Test User')
+        self.assertEqual(profile_data['bio'], 'Test bio')
+        self.assertEqual(profile_data['year_level'], 2)
+        self.assertEqual(profile_data['tech_stack'], ['Python', 'Django'])
+        
+        # Check tokens structure
+        tokens = response.data['tokens']
+        self.assertIn('access', tokens)
+        self.assertIn('refresh', tokens)
+        
+        # Ensure no extra arguments are present in the main response
+        expected_keys = {'message', 'user', 'tokens'}
+        actual_keys = set(response.data.keys())
+        self.assertEqual(actual_keys, expected_keys, 
+                        "Response should only contain 'message', 'user', and 'tokens' keys")
+
+    def test_mentor_token_obtain_clean_response(self):
+        """Test that mentor login returns clean response format"""
+        # Create a mentor user
+        user = User.objects.create_user(
+            username='mentoruser',
+            email='mentor@example.com',
+            password='mentorpassword123'
+        )
+        
+        # Create mentor profile
+        MentorProfile.objects.create(
+            user=user,
+            name='Mentor User',
+            bio='Senior Developer',
+            years_of_experience=5,
+            expertise_tags=['Python', 'Django', 'AWS'],
+            company='Tech Corp',
+            position='Senior Developer'
+        )
+        
+        data = {
+            'username': 'mentoruser',
+            'password': 'mentorpassword123'
+        }
+        
+        response = self.client.post(self.token_url, data)
+        
+        # Check status code
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Check response structure
+        self.assertIn('message', response.data)
+        self.assertIn('user', response.data)
+        self.assertIn('tokens', response.data)
+        
+        # Check message content
+        self.assertEqual(response.data['message'], 'Login successful')
+        
+        # Check user data structure
+        user_data = response.data['user']
+        self.assertEqual(user_data['id'], user.id)
+        self.assertEqual(user_data['username'], 'mentoruser')
+        self.assertEqual(user_data['email'], 'mentor@example.com')
+        self.assertEqual(user_data['user_type'], 'mentor')
+        
+        # Check profile data
+        self.assertIn('profile', user_data)
+        profile_data = user_data['profile']
+        self.assertEqual(profile_data['name'], 'Mentor User')
+        self.assertEqual(profile_data['bio'], 'Senior Developer')
+        self.assertEqual(profile_data['years_of_experience'], 5)
+        self.assertEqual(profile_data['expertise_tags'], ['Python', 'Django', 'AWS'])
+        self.assertEqual(profile_data['company'], 'Tech Corp')
+        self.assertEqual(profile_data['position'], 'Senior Developer')
+        
+        # Check tokens structure
+        tokens = response.data['tokens']
+        self.assertIn('access', tokens)
+        self.assertIn('refresh', tokens)
+        
+        # Ensure no extra arguments are present in the main response
+        expected_keys = {'message', 'user', 'tokens'}
+        actual_keys = set(response.data.keys())
+        self.assertEqual(actual_keys, expected_keys, 
+                        "Response should only contain 'message', 'user', and 'tokens' keys")
 
 
 class StudentProfileAPITests(APITestCase):

@@ -35,6 +35,7 @@ urlpatterns = [
     path('messages/<int:user_id>/', MessageAPIView.as_view(), name='message_history'),
     path('messages/stream/<int:user_id>/', MessageStreamView.as_view(), name='message_stream'),
     path('api/register/', RateLimitedRegisterView.as_view(), name='register'),
+    path('api/login/', RateLimitedTokenObtainPairView.as_view(), name='login'),
     path('api/token/', RateLimitedTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', RateLimitedTokenRefreshView.as_view(), name='token_refresh'),
 ]

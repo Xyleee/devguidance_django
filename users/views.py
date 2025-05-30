@@ -7,7 +7,8 @@ from .serializers import (
     MentorProfileSerializer,
     MentorListSerializer,
     MentorshipRequestSerializer,
-    MessageSerializer
+    MessageSerializer,
+    CustomTokenObtainPairSerializer
 )
 from rest_framework import generics, viewsets, permissions, status, filters
 from rest_framework.views import APIView
@@ -954,8 +955,137 @@ class RateLimitedRegisterView(RegisterView):
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
 
+@extend_schema(
+    operation_id='login_user',
+    tags=['Authentication'],
+    summary='User login',
+    description='''
+    Authenticate user and obtain JWT tokens.
+    
+    **Features:**
+    - Clean response format with success message
+    - Returns user profile information
+    - Provides JWT access and refresh tokens
+    - Rate limited to prevent abuse
+    
+    **Rate Limiting:** 5 requests per minute
+    ''',
+    request=inline_serializer(
+        name='LoginRequest',
+        fields={
+            'username': OpenApiTypes.STR,
+            'password': OpenApiTypes.STR,
+        }
+    ),
+    responses={
+        200: OpenApiResponse(
+            response=inline_serializer(
+                name='LoginResponse',
+                fields={
+                    'message': OpenApiTypes.STR,
+                    'user': OpenApiTypes.OBJECT,
+                    'tokens': OpenApiTypes.OBJECT,
+                }
+            ),
+            description='Login successful',
+            examples=[
+                OpenApiExample(
+                    'Student Login Success',
+                    summary='Successful student login',
+                    description='Response when a student successfully logs in',
+                    value={
+                        "message": "Login successful",
+                        "user": {
+                            "id": 1,
+                            "username": "johndoe",
+                            "email": "john@example.com",
+                            "user_type": "student",
+                            "profile": {
+                                "id": 1,
+                                "name": "John Doe",
+                                "bio": "Computer Science student",
+                                "year_level": 3,
+                                "tech_stack": ["Python", "React", "Django"],
+                                "photo_url": "/media/profiles/john.jpg"
+                            }
+                        },
+                        "tokens": {
+                            "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                            "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        }
+                    }
+                ),
+                OpenApiExample(
+                    'Mentor Login Success',
+                    summary='Successful mentor login',
+                    description='Response when a mentor successfully logs in',
+                    value={
+                        "message": "Login successful",
+                        "user": {
+                            "id": 2,
+                            "username": "janementor",
+                            "email": "jane@example.com",
+                            "user_type": "mentor",
+                            "profile": {
+                                "id": 1,
+                                "name": "Jane Smith",
+                                "bio": "Senior Software Engineer",
+                                "years_of_experience": 5,
+                                "expertise_tags": ["Python", "Django", "AWS"],
+                                "company": "Tech Corp",
+                                "position": "Senior Developer",
+                                "photo_url": "/media/profiles/jane.jpg"
+                            }
+                        },
+                        "tokens": {
+                            "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                            "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        }
+                    }
+                )
+            ]
+        ),
+        401: OpenApiResponse(
+            description='Invalid credentials',
+            examples=[
+                OpenApiExample(
+                    'Invalid Credentials',
+                    summary='Login failed',
+                    value={
+                        "detail": "No active account found with the given credentials"
+                    }
+                )
+            ]
+        ),
+        429: OpenApiResponse(
+            description='Rate limit exceeded',
+            examples=[
+                OpenApiExample(
+                    'Rate Limited',
+                    summary='Too many login attempts',
+                    value={
+                        "detail": "Rate limit exceeded. Try again in 45 seconds."
+                    }
+                )
+            ]
+        )
+    },
+    examples=[
+        OpenApiExample(
+            'Login Request',
+            summary='User login credentials',
+            description='Example login request with username and password',
+            value={
+                "username": "johndoe",
+                "password": "securepassword123"
+            }
+        )
+    ]
+)
 class RateLimitedTokenObtainPairView(TokenObtainPairView):
-    """Rate-limited version of the token obtain pair view"""
+    """Rate-limited version of the token obtain pair view with clean response format"""
+    serializer_class = CustomTokenObtainPairSerializer
+    
     @rate_limit(max_requests=5, timeframe=60)
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)

@@ -8,6 +8,8 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.exceptions import ValidationError
 import os
 import magic
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 class PhotoValidationMixin:
     """Mixin for validating photo uploads"""
@@ -326,3 +328,57 @@ class MessageSerializer(serializers.ModelSerializer, FileValidationMixin):
             self.validate_file(file)
             
         return attrs
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Custom JWT serializer that returns clean user data with tokens"""
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        
+        # Get user profile information
+        user = self.user
+        user_data = {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+        }
+        
+        # Add profile information based on user type
+        if hasattr(user, 'students_profile'):
+            profile = user.students_profile
+            user_data.update({
+                'user_type': 'student',
+                'profile': {
+                    'id': profile.id,
+                    'name': profile.name,
+                    'bio': profile.bio,
+                    'year_level': profile.year_level,
+                    'tech_stack': profile.tech_stack,
+                    'photo_url': profile.profile_picture.url if profile.profile_picture else None
+                }
+            })
+        elif hasattr(user, 'mentors_profile'):
+            profile = user.mentors_profile
+            user_data.update({
+                'user_type': 'mentor',
+                'profile': {
+                    'id': profile.id,
+                    'name': profile.name,
+                    'bio': profile.bio,
+                    'years_of_experience': profile.years_of_experience,
+                    'expertise_tags': profile.expertise_tags,
+                    'company': profile.company,
+                    'position': profile.position,
+                    'photo_url': profile.profile_picture.url if profile.profile_picture else None
+                }
+            })
+        
+        # Return clean response format
+        return {
+            'message': 'Login successful',
+            'user': user_data,
+            'tokens': {
+                'access': data['access'],
+                'refresh': data['refresh']
+            }
+        }
