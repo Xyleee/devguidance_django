@@ -617,35 +617,49 @@ class MessageStreamView(APIView):
     def _event_stream(self, current_user, other_user):
         logger.info(f"MessageStreamView._event_stream: Starting event stream between {current_user.username} and {other_user.username}")
         try:
-            last_check = timezone.now() # Use timezone.now() for consistency with Django model timestamps
-            
+            last_check = timezone.now()
+            # Introduce a counter for sending keep-alive pings periodically
+            keep_alive_counter = 0
+            # Define how often to send a keep-alive (e.g., every 5 polling cycles)
+            # Polling interval is ~2s, so this is ~10s for a keep-alive
+            KEEP_ALIVE_INTERVAL_CYCLES = int(os.getenv('KEEP_ALIVE_INTERVAL_CYCLES', 5)) 
+
             while True:
-                # Query for new messages
-                # Ensure timestamp comparison is timezone-aware if model timestamp is timezone-aware
                 new_messages = Message.objects.filter(
                     (Q(sender=current_user) & Q(receiver=other_user)) |
                     (Q(sender=other_user) & Q(receiver=current_user)),
                     timestamp__gt=last_check 
                 ).order_by('timestamp')
                 
+                sent_message_this_cycle = False
                 for message in new_messages:
                     logger.debug(f"MessageStreamView._event_stream: Streaming message ID {message.id}")
                     try:
                         serializer = MessageSerializer(message)
                         data = json.dumps(serializer.data)
                         yield f"data: {data}\n\n"
-                        last_check = message.timestamp # Update last_check to the timestamp of the last sent message
+                        last_check = message.timestamp
+                        sent_message_this_cycle = True
                     except Exception as e:
                         logger.exception(f"MessageStreamView._event_stream: Error serializing message ID {message.id}: {str(e)}")
                 
-                # time.sleep(2) # Check for new messages every 2 seconds (consider making this configurable or use a different mechanism if possible)
-                # Using a simple sleep. For production, consider Django Channels or other async solutions for push notifications.
-                # For now, keeping it simple with polling for debugging.
+                if not sent_message_this_cycle:
+                    keep_alive_counter += 1
+                    if keep_alive_counter >= KEEP_ALIVE_INTERVAL_CYCLES:
+                        logger.debug("MessageStreamView._event_stream: Sending keep-alive ping.")
+                        yield ": keep-alive\n\n" # SSE comment for keep-alive
+                        keep_alive_counter = 0 # Reset counter
+                else:
+                    keep_alive_counter = 0 # Reset counter if a message was sent
+
                 time.sleep(settings.MESSAGE_STREAM_POLL_INTERVAL if hasattr(settings, 'MESSAGE_STREAM_POLL_INTERVAL') else 2)
 
         except Exception as e:
             logger.exception(f"MessageStreamView._event_stream: Error in message stream: {str(e)}")
-            yield f"data: {json.dumps({'error': 'Streaming error occurred', 'detail': str(e)})}\n\n"
+            try:
+                yield f"data: {json.dumps({'error': 'Streaming error occurred', 'detail': str(e)})}\n\n"
+            except Exception as ye:
+                logger.error(f"MessageStreamView._event_stream: CRITICAL - Could not even yield error to stream: {str(ye)}")
 
 class RateLimitedRegisterView(RegisterView):
     """Rate-limited version of the register view"""
