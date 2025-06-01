@@ -32,6 +32,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 import logging
 
+logger = logging.getLogger(__name__) # Define logger at module level
+
 # Create your views here.
 
 def home(request):
