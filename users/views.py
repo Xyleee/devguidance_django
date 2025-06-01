@@ -615,16 +615,17 @@ class MessageStreamView(APIView):
             )
     
     def _event_stream(self, current_user, other_user):
-        logger.info(f"MessageStreamView._event_stream: Starting event stream between {current_user.username} and {other_user.username}")
+        logger.info(f"MessageStreamView._event_stream: INIT - Starting event stream between {current_user.username} and {other_user.username}")
         try:
             last_check = timezone.now()
-            # Introduce a counter for sending keep-alive pings periodically
             keep_alive_counter = 0
-            # Define how often to send a keep-alive (e.g., every 5 polling cycles)
-            # Polling interval is ~2s, so this is ~10s for a keep-alive
-            KEEP_ALIVE_INTERVAL_CYCLES = int(os.getenv('KEEP_ALIVE_INTERVAL_CYCLES', 5)) 
+            KEEP_ALIVE_INTERVAL_CYCLES = int(os.getenv('KEEP_ALIVE_INTERVAL_CYCLES', 5))
+            cycles_count = 0 # For debugging how many loops it runs
 
             while True:
+                cycles_count += 1
+                logger.debug(f"MessageStreamView._event_stream: LOOP {cycles_count} - last_check: {last_check}")
+                
                 new_messages = Message.objects.filter(
                     (Q(sender=current_user) & Q(receiver=other_user)) |
                     (Q(sender=other_user) & Q(receiver=current_user)),
@@ -633,33 +634,44 @@ class MessageStreamView(APIView):
                 
                 sent_message_this_cycle = False
                 for message in new_messages:
-                    logger.debug(f"MessageStreamView._event_stream: Streaming message ID {message.id}")
+                    logger.debug(f"MessageStreamView._event_stream: LOOP {cycles_count} - Streaming message ID {message.id}")
                     try:
                         serializer = MessageSerializer(message)
                         data = json.dumps(serializer.data)
                         yield f"data: {data}\n\n"
                         last_check = message.timestamp
                         sent_message_this_cycle = True
+                        logger.info(f"MessageStreamView._event_stream: LOOP {cycles_count} - Successfully yielded message ID {message.id}. New last_check: {last_check}")
                     except Exception as e:
-                        logger.exception(f"MessageStreamView._event_stream: Error serializing message ID {message.id}: {str(e)}")
+                        logger.exception(f"MessageStreamView._event_stream: LOOP {cycles_count} - Error serializing/yielding message ID {message.id}: {str(e)}")
                 
                 if not sent_message_this_cycle:
                     keep_alive_counter += 1
+                    logger.debug(f"MessageStreamView._event_stream: LOOP {cycles_count} - No new messages. Keep-alive counter: {keep_alive_counter}")
                     if keep_alive_counter >= KEEP_ALIVE_INTERVAL_CYCLES:
-                        logger.debug("MessageStreamView._event_stream: Sending keep-alive ping.")
+                        logger.info(f"MessageStreamView._event_stream: LOOP {cycles_count} - Sending keep-alive ping.")
                         yield ": keep-alive\n\n" # SSE comment for keep-alive
-                        keep_alive_counter = 0 # Reset counter
+                        keep_alive_counter = 0 
                 else:
-                    keep_alive_counter = 0 # Reset counter if a message was sent
+                    keep_alive_counter = 0 
+
+                # Check for a way to signal client-side disconnect if possible (advanced)
+                # For now, relying on Render/Gunicorn to handle broken pipe if client disconnects
 
                 time.sleep(settings.MESSAGE_STREAM_POLL_INTERVAL if hasattr(settings, 'MESSAGE_STREAM_POLL_INTERVAL') else 2)
+                logger.debug(f"MessageStreamView._event_stream: LOOP {cycles_count} - Cycle ended, sleeping.")
 
+        except GeneratorExit:
+            # This exception is raised when the client disconnects (the generator is closed from the outside)
+            logger.info(f"MessageStreamView._event_stream: GENERATOR_EXIT - Client disconnected for stream between {current_user.username} and {other_user.username}. Loop ran {cycles_count} times.")
         except Exception as e:
-            logger.exception(f"MessageStreamView._event_stream: Error in message stream: {str(e)}")
+            logger.exception(f"MessageStreamView._event_stream: UNHANDLED_EXCEPTION - Error in message stream for {current_user.username} and {other_user.username}. Loop ran {cycles_count} times. Error: {str(e)}")
             try:
-                yield f"data: {json.dumps({'error': 'Streaming error occurred', 'detail': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': 'Streaming error occurred unexpectedly', 'detail': str(e)})}\n\n"
             except Exception as ye:
-                logger.error(f"MessageStreamView._event_stream: CRITICAL - Could not even yield error to stream: {str(ye)}")
+                logger.error(f"MessageStreamView._event_stream: CRITICAL - Could not yield final error to stream: {str(ye)}")
+        finally:
+            logger.info(f"MessageStreamView._event_stream: FINALLY - Event stream ended for {current_user.username} and {other_user.username}. Loop ran {cycles_count} times.")
 
 class RateLimitedRegisterView(RegisterView):
     """Rate-limited version of the register view"""
