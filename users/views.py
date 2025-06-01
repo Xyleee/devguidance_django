@@ -30,6 +30,7 @@ from .rate_limiting import rate_limit
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+import logging
 
 # Create your views here.
 
@@ -385,99 +386,103 @@ class MessageAPIView(APIView):
         tags=['Messaging']
     )
     def post(self, request):
-        """Send a message to another user"""
+        logger.info(f"MessageAPIView.post: Received request from user {request.user.id if request.user else 'Anonymous'}")
+        logger.debug(f"MessageAPIView.post: Request data: {request.data}")
         try:
-            # Get the receiver ID from the request data
             receiver_id = request.data.get('receiver')
+            content = request.data.get('content') # Get content for logging
+            logger.info(f"MessageAPIView.post: Attempting to send message to receiver_id: {receiver_id} with content: '{content[:50]}...'")
+
             if not receiver_id:
+                logger.warning("MessageAPIView.post: Receiver ID is required")
                 return Response({"detail": "Receiver ID is required"}, status=status.HTTP_400_BAD_REQUEST)
             
             try:
+                logger.debug("MessageAPIView.post: Fetching receiver user object.")
                 receiver = User.objects.get(id=receiver_id)
+                logger.info(f"MessageAPIView.post: Receiver user object fetched: {receiver.username}")
             except User.DoesNotExist:
+                logger.warning(f"MessageAPIView.post: Receiver not found for ID: {receiver_id}")
                 return Response({"detail": "Receiver not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            # Check if the sender and receiver are in a valid mentorship relationship
             sender = request.user
-            
-            # Ensure both users have the required profiles
+            logger.info(f"MessageAPIView.post: Sender user: {sender.username}")
+
             if not (hasattr(sender, 'student_profile') or hasattr(sender, 'mentor_profile')):
+                logger.warning(f"MessageAPIView.post: Sender {sender.username} lacks student/mentor profile.")
                 return Response(
                     {"detail": "Sender must have either a student or mentor profile"},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
             if not (hasattr(receiver, 'student_profile') or hasattr(receiver, 'mentor_profile')):
+                logger.warning(f"MessageAPIView.post: Receiver {receiver.username} lacks student/mentor profile.")
                 return Response(
                     {"detail": "Receiver must have either a student or mentor profile"},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Case 1: Sender is a student, receiver is a mentor
+            logger.debug("MessageAPIView.post: Validating mentorship relationship.")
             if hasattr(sender, 'student_profile') and hasattr(receiver, 'mentor_profile'):
-                # Check if there's an accepted mentorship request
                 is_valid = MentorshipRequest.objects.filter(
                     student=sender,
                     mentor=receiver,
                     status='accepted'
                 ).exists()
-                
                 if not is_valid:
+                    logger.warning(f"MessageAPIView.post: Student {sender.username} to Mentor {receiver.username} - No accepted mentorship.")
                     return Response(
                         {"detail": "You can only message your accepted mentor"},
                         status=status.HTTP_403_FORBIDDEN
                     )
-            
-            # Case 2: Sender is a mentor, receiver is a student
             elif hasattr(sender, 'mentor_profile') and hasattr(receiver, 'student_profile'):
-                # Check if there's an accepted mentorship request
                 is_valid = MentorshipRequest.objects.filter(
                     student=receiver,
                     mentor=sender,
                     status='accepted'
                 ).exists()
-                
                 if not is_valid:
+                    logger.warning(f"MessageAPIView.post: Mentor {sender.username} to Student {receiver.username} - No accepted mentorship.")
                     return Response(
                         {"detail": "You can only message your accepted mentees"},
                         status=status.HTTP_403_FORBIDDEN
                     )
-                
-                # Check if mentor has exceeded the 5 mentee limit
                 accepted_mentees = MentorshipRequest.objects.filter(
                     mentor=sender,
                     status='accepted'
                 ).count()
-                
-                if accepted_mentees > 5:
+                if accepted_mentees >= 5: # Assuming 5 is the limit
+                    logger.warning(f"MessageAPIView.post: Mentor {sender.username} has reached mentee limit ({accepted_mentees}).")
                     return Response(
-                        {"detail": "You have reached the maximum limit of 5 mentees"},
+                        {"detail": "You have reached the maximum limit of 5 mentees"}, # Ensure limit is correct
                         status=status.HTTP_403_FORBIDDEN
                     )
-            
             else:
+                logger.warning(f"MessageAPIView.post: Invalid roles for messaging between {sender.username} and {receiver.username}.")
                 return Response(
                     {"detail": "Invalid user roles for messaging"},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            
-            # Create the message
+            logger.info("MessageAPIView.post: Mentorship relationship validated.")
+
             message_data = request.data.copy()
-            message_data['receiver'] = receiver.id
-            
-            serializer = MessageSerializer(data=message_data)
+            # Ensure receiver in message_data is the ID, not the object, if serializer expects ID.
+            # Serializer might handle `receiver` object correctly if PrimaryKeyRelatedField, but being explicit for debug.
+            message_data['receiver'] = receiver.id 
+            logger.debug(f"MessageAPIView.post: Preparing to serialize message_data: {message_data}")
+
+            serializer = MessageSerializer(data=message_data, context={'request': request}) # Pass request to context if needed by serializer
             if serializer.is_valid():
-                serializer.save(sender=sender, receiver=receiver)
+                logger.info("MessageAPIView.post: Serializer is valid. Saving message.")
+                serializer.save(sender=sender, receiver=receiver) # receiver object passed here
+                logger.info(f"MessageAPIView.post: Message saved successfully. ID: {serializer.instance.id}")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
-            
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                logger.error(f"MessageAPIView.post: Serializer errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
         except Exception as e:
-            # Log the error for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error in MessageAPIView.post: {str(e)}")
-            
+            logger.exception(f"MessageAPIView.post: Unhandled exception: {str(e)}") # logger.exception includes traceback
             return Response(
                 {"detail": "An internal error occurred. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -549,94 +554,95 @@ class MessageStreamView(APIView):
     permission_classes = [IsAuthenticated, IsMessageAllowed]
     
     def get(self, request, user_id):
-        """Stream new messages in real-time using SSE"""
+        logger.info(f"MessageStreamView.get: Stream request from user {request.user.id} for user_id: {user_id}")
         try:
             try:
+                logger.debug("MessageStreamView.get: Fetching other_user object.")
                 other_user = User.objects.get(id=user_id)
+                logger.info(f"MessageStreamView.get: other_user object fetched: {other_user.username}")
             except User.DoesNotExist:
+                logger.warning(f"MessageStreamView.get: User not found for ID: {user_id}")
                 return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            # Ensure both users have the required profiles
-            if not (hasattr(request.user, 'student_profile') or hasattr(request.user, 'mentor_profile')):
+            current_user = request.user
+            logger.info(f"MessageStreamView.get: Current user: {current_user.username}")
+
+            if not (hasattr(current_user, 'student_profile') or hasattr(current_user, 'mentor_profile')):
+                logger.warning(f"MessageStreamView.get: Current user {current_user.username} lacks student/mentor profile.")
                 return Response(
                     {"detail": "User must have either a student or mentor profile"},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
             if not (hasattr(other_user, 'student_profile') or hasattr(other_user, 'mentor_profile')):
+                logger.warning(f"MessageStreamView.get: Target user {other_user.username} lacks student/mentor profile.")
                 return Response(
                     {"detail": "Target user must have either a student or mentor profile"},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Check if the users are in a valid mentorship relationship
+            logger.debug("MessageStreamView.get: Validating mentorship relationship for stream.")
             is_valid = MentorshipRequest.objects.filter(
-                (Q(student=request.user) & Q(mentor=other_user)) |
-                (Q(student=other_user) & Q(mentor=request.user)),
+                (Q(student=current_user) & Q(mentor=other_user)) |
+                (Q(student=other_user) & Q(mentor=current_user)),
                 status='accepted'
             ).exists()
             
             if not is_valid:
+                logger.warning(f"MessageStreamView.get: No accepted mentorship between {current_user.username} and {other_user.username} for stream.")
                 return Response(
                     {"detail": "You are not allowed to receive messages from this user"},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            
-            # Return a streaming response
+            logger.info("MessageStreamView.get: Mentorship relationship for stream validated.")
+
             return StreamingHttpResponse(
-                self._event_stream(request.user, other_user),
+                self._event_stream(current_user, other_user),
                 content_type='text/event-stream'
             )
             
         except Exception as e:
-            # Log the error for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error in MessageStreamView.get: {str(e)}")
-            
+            logger.exception(f"MessageStreamView.get: Unhandled exception: {str(e)}")
+            # For a streaming view, returning a standard HTTP Response on error might be tricky.
+            # The client might already be expecting a stream. This error might not reach the client cleanly.
+            # However, it will be logged.
             return Response(
-                {"detail": "An internal error occurred. Please try again later."},
+                {"detail": "An internal error occurred during stream setup. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def _event_stream(self, current_user, other_user):
-        """Generate SSE events for new messages"""
+        logger.info(f"MessageStreamView._event_stream: Starting event stream between {current_user.username} and {other_user.username}")
         try:
-            # Keep track of the latest message timestamp
-            last_check = time.time()
+            last_check = timezone.now() # Use timezone.now() for consistency with Django model timestamps
             
             while True:
                 # Query for new messages
+                # Ensure timestamp comparison is timezone-aware if model timestamp is timezone-aware
                 new_messages = Message.objects.filter(
                     (Q(sender=current_user) & Q(receiver=other_user)) |
                     (Q(sender=other_user) & Q(receiver=current_user)),
-                    timestamp__gt=timezone.datetime.fromtimestamp(last_check, tz=timezone.utc)
+                    timestamp__gt=last_check 
                 ).order_by('timestamp')
                 
-                # Send each new message as an SSE event
                 for message in new_messages:
+                    logger.debug(f"MessageStreamView._event_stream: Streaming message ID {message.id}")
                     try:
                         serializer = MessageSerializer(message)
                         data = json.dumps(serializer.data)
                         yield f"data: {data}\n\n"
+                        last_check = message.timestamp # Update last_check to the timestamp of the last sent message
                     except Exception as e:
-                        # Log serialization errors but continue streaming
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.error(f"Error serializing message {message.id}: {str(e)}")
+                        logger.exception(f"MessageStreamView._event_stream: Error serializing message ID {message.id}: {str(e)}")
                 
-                # Update the last check time
-                last_check = time.time()
-                
-                # Sleep to avoid excessive database queries
-                time.sleep(2)  # Check for new messages every 2 seconds
-                
+                # time.sleep(2) # Check for new messages every 2 seconds (consider making this configurable or use a different mechanism if possible)
+                # Using a simple sleep. For production, consider Django Channels or other async solutions for push notifications.
+                # For now, keeping it simple with polling for debugging.
+                time.sleep(settings.MESSAGE_STREAM_POLL_INTERVAL if hasattr(settings, 'MESSAGE_STREAM_POLL_INTERVAL') else 2)
+
         except Exception as e:
-            # Log streaming errors
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error in message streaming: {str(e)}")
-            yield f"data: {json.dumps({'error': 'Streaming error occurred'})}\n\n"
+            logger.exception(f"MessageStreamView._event_stream: Error in message stream: {str(e)}")
+            yield f"data: {json.dumps({'error': 'Streaming error occurred', 'detail': str(e)})}\n\n"
 
 class RateLimitedRegisterView(RegisterView):
     """Rate-limited version of the register view"""

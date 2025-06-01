@@ -253,3 +253,47 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.TokenObtainSlidingSerializer",
     "SLIDING_TOKEN_REFRESH_SERIALIZER": "rest_framework_simplejwt.serializers.TokenRefreshSlidingSerializer",
 }
+
+# LOGGING CONFIGURATION
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG', # Capture DEBUG and above for console
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'), # Default to INFO, can be overridden by env var
+            'propagate': False,
+        },
+        'users': { # Your app-specific logger
+            'handlers': ['console'],
+            'level': 'DEBUG', # Capture all DEBUG messages from your app
+            'propagate': True,
+        },
+        # You can add other app loggers here
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO', # Root logger level
+    }
+}
+
+# Optional: For Message Stream Polling Interval
+# MESSAGE_STREAM_POLL_INTERVAL = 2 # seconds (can be overridden by environment variable if needed)
+# Example: MESSAGE_STREAM_POLL_INTERVAL = int(os.getenv('MESSAGE_STREAM_POLL_INTERVAL', 2))
