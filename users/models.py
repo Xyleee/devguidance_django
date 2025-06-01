@@ -192,6 +192,7 @@ class Message(models.Model):
     content = models.TextField(blank=True)
     file = models.FileField(upload_to='message_files/', blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['timestamp']
