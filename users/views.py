@@ -393,7 +393,8 @@ class MessageAPIView(APIView):
         try:
             receiver_id = request.data.get('receiver')
             content = request.data.get('content') # Get content for logging
-            logger.info(f"MessageAPIView.post: Attempting to send message to receiver_id: {receiver_id} with content: '{content[:50]}...'")
+            content_log_display = (content[:50] + '...') if content else '[No text content]'
+            logger.info(f"MessageAPIView.post: Attempting to send message to receiver_id: {receiver_id} with content: '{content_log_display}'")
 
             if not receiver_id:
                 logger.warning("MessageAPIView.post: Receiver ID is required")
